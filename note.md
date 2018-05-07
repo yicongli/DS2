@@ -1,7 +1,7 @@
 1. Overall:
 	- allow servers to join the network at any time (after clients have joined)
 	- register once: at previous project, can register at the same time with the same user name
-	- guanrantees that an activity message sent by a client reaches all clients that are connected to the network at the time that the message was sent
+	- guanrantees that an activity message sent by a client reaches all clients that are connected to the network at the time that the message was sent (timestamp)
 		+ if the client log out before receiving the message, save that message and remember the client. Send the msg again when the client log in
 
 	- guarantees that all activity messages sent by a client are delivered in the same order at each receiving client
