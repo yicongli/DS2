@@ -23,3 +23,5 @@
 	- the delivery order of messages should be preserved
 
 5. Topology: high-availability seamless redundancy
+
+6.
