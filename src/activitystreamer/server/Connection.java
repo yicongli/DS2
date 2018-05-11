@@ -24,9 +24,13 @@ public class Connection extends Thread {
 	private boolean open = false;
 	private Socket socket;
 	private boolean term=false;
-	private boolean isServer = false; // add by yicongLI 20-04-18 isServerflag, defualt is not sever
-	private String username = ""; // store the username for logged in client
-	private String secrete  = ""; // store the secrete for Server and client
+	// add by yicongLI 20-04-18 
+	// the flag to indicate if the connection is client, defualt is not sever
+	private boolean isServer = false; 
+	// store the username for logged in client
+	private String username = ""; 
+	// store the secrete for Server and client
+	private String secrete  = ""; 
 	
 	Connection(Socket socket) throws IOException{
 		in = new DataInputStream(socket.getInputStream());
@@ -45,10 +49,6 @@ public class Connection extends Thread {
 		if(open){
 			outwriter.println(msg);
 			outwriter.flush();
-			// mod by yicongLI 19-04-18
-			// out put sending method
-			// log.debug("Msg to "+Settings.socketAddress(socket)+":"+msg);
-			// end
 			return true;	
 		}
 		return false;

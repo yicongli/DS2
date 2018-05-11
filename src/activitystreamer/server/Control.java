@@ -26,10 +26,14 @@ public class Control extends Thread {
 	private static ArrayList<Connection> connections;
 	private static boolean term = false;
 	private static Listener listener;
-	private static JSONParser parser; // add by yicongLI 19-04-18
-	private static ArrayList<JSONObject> announcementInfo; // add by yicongLI 20-04-18
-	private static String uniqueID; // add by yicongLI 23-04-18 the ID of current server
-	private static ArrayList<LockItem> lockItemArray; // add by yicongLI 23-04-18 the items handling the lock request
+	// add by yicongLI 19-04-18 the parser to parse the Json data
+	private static JSONParser parser; 
+	 // add by yicongLI 20-04-18 the announcement Info from the other server
+	private static ArrayList<JSONObject> announcementInfo;
+	// add by yicongLI 23-04-18 the Identification of current server
+	private static String uniqueID; 
+	// add by yicongLI 23-04-18 the items handling the lock request
+	private static ArrayList<LockItem> lockItemArray; 
 
 	protected static Control control = null;
 
@@ -41,19 +45,16 @@ public class Control extends Thread {
 	}
 
 	public Control() {
-		// initialize the connections array
+		// initialize the connections/announcement info/lock item array
 		connections = new ArrayList<Connection>();
 		announcementInfo = new ArrayList<JSONObject>();
 		lockItemArray = new ArrayList<LockItem>();
+		parser = new JSONParser(); // add by yicongLI 19-04-18 initialise parser and remote connection
+		uniqueID = Settings.nextSecret();
 		// start a listener
 		try {
 			listener = new Listener();
-			// add by yicongLI 19-04-18
-			// initialise parser and remote connection
-			parser = new JSONParser();
 			initiateConnection();
-			uniqueID = Settings.nextSecret();
-			// end
 
 			start(); // start regular operation
 		} catch (IOException e1) {
@@ -81,8 +82,8 @@ public class Control extends Thread {
 	}
 
 	/*
-	 * Processing incoming messages from the connection. Return true if the
-	 * connection should close. mod by yicongLI 19-04-18 add json parsing operation
+	 * Processing incoming messages from the connection. Return true if the connection should close.
+	 * mod by yicongLI 19-04-18 add json parsing operation
 	 */
 	public synchronized boolean process(Connection con, String msg) {
 		log.debug(msg);
@@ -142,95 +143,6 @@ public class Control extends Thread {
 	 */
 
 	/*
-	 * Added by shajidm@student.unimelb.edu.au to define the LogIn Method
-	 */
-	private synchronized boolean loginUser(Connection con, String msg) {
-		try {
-			String cmd = null;
-			String info = null;
-
-			JSONObject loginObject = (JSONObject) parser.parse(msg);
-			if (!loginObject.containsKey("username")) {
-				responseInvalidMsg("The instruction misses a username", con);
-				return true;
-			} else {
-
-				String username = (String) loginObject.get("username");
-				String secret = "";
-				if (!username.equalsIgnoreCase("anonymous")) {
-					secret = (String) loginObject.get("secret");
-				}
-
-				FileReader usersFile = null;
-				JSONObject userlist = new JSONObject();
-
-				String filename = String.valueOf(Settings.getLocalPort()) + ".json";
-				File file = new File(filename);
-				if (!file.exists()) {
-					createNewFile();
-				}
-				
-				usersFile = new FileReader(filename);
-				userlist = (JSONObject) parser.parse(usersFile);
-
-				// Search for the username
-				// If username is found
-				if (userlist.containsKey(username)) {
-					// compare the secretkeys
-					if (userlist.get(username).equals(secret)) {
-						cmd = "LOGIN_SUCCESS";
-						info = "logged in as user " + username;
-						con.setUsername(username);
-						con.setSecret(secret);
-						responseMsg(cmd, info, con);
-
-						int currentLoad = loadNum();
-						JSONObject target = null;
-						
-						for (JSONObject jsonAvailabilityObj : announcementInfo) {
-								Long newLoad = (Long) jsonAvailabilityObj.get("load");
-
-								if (newLoad < (currentLoad - 2)) {
-									target = jsonAvailabilityObj;
-								}
-						}
-						// shajid
-						
-						if (target != null) {
-							String newHostName = (String) target.get("hostname");
-							Long newPort = (Long) target.get("port");
-							cmd = "REDIRECT";
-							responseRedirectionMsg(cmd, newHostName, newPort, con);
-							return true;
-						} else {
-							return false;
-						}
-						
-						
-						
-					} else {
-						return loginFailed("secret:"+secret+" not right", con);
-					}
-
-				} else {
-					// If username is not found, login failed
-					return loginFailed("User not found ", con);
-				}
-
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return false;
-	}
-	
-    private boolean loginFailed(String info, Connection con) {
-		responseMsg("LOGIN_FAILED", info, con);
-		connectionClosed(con);
-		return true;
-	}
-
-	/*
 	 * add by yicongLI 19-04-18 send authenticate
 	 */
 	@SuppressWarnings("unchecked")
@@ -259,6 +171,9 @@ public class Control extends Thread {
 		broadcastMessage(null, msgObj.toJSONString(), true);
 	}
 	
+	/*
+	 * return current load count 
+	 */
 	private synchronized Integer loadNum () {
 		Integer load = 0;
 
@@ -283,16 +198,15 @@ public class Control extends Thread {
 
 		Integer outNum = broadcastMessage(null, msgObj.toJSONString(), true);
 		
+		// if current server has no connected server, then check local storage directly.
 		if (outNum == 0) {
 			String filename = String.valueOf(Settings.getLocalPort()) + ".json";
 			File f = new File(filename);
 
-			boolean check = false;
 			// file is already existed
 			if (f.exists()) {
-				check = checkLocalStorage(filename, userName);
 				// Register failed, found the user in the system
-				if (check) {
+				if (checkLocalStorage(filename, userName)) {
 					registerFail(userName, clientCon);
 				}
 				else {
@@ -306,7 +220,6 @@ public class Control extends Thread {
 		else {
 			lockItemArray.add(new LockItem(userName, clientCon, outNum));
 		}
-		
 	}
 
 	/*
@@ -370,11 +283,107 @@ public class Control extends Thread {
 		
 		log.info(msgObj.toJSONString());
 	}
+	
 	/*
-	 * Added by shajidm@student.unimelb.edu.au to define the responseRedirectionMsg
+	 * Added by shajidm@student.unimelb.edu.au to define the LogIn Method
+	 */
+	private synchronized boolean loginUser(Connection con, String msg) {
+		String cmd = null;
+		String info = null;
+
+		JSONObject loginObject = null;
+		try {
+			loginObject = (JSONObject) parser.parse(msg);
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+		
+		// check if the login info is valid
+		if (!loginObject.containsKey("username")) {
+			responseInvalidMsg("The instruction misses a username", con);
+			return true;
+		} 
+		
+		String username = (String) loginObject.get("username");
+		String secret = "";
+		if (!username.equalsIgnoreCase("anonymous")) {
+			secret = (String) loginObject.get("secret");
+		}
+
+		FileReader usersFile = null;
+		JSONObject userlist = null;
+
+		String filename = String.valueOf(Settings.getLocalPort()) + ".json";
+		File file = new File(filename);
+		if (!file.exists()) {
+			createNewFile();
+		}
+		
+		try {
+			usersFile = new FileReader(filename);
+			userlist = (JSONObject) parser.parse(usersFile);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+
+		// Search for the username
+		// If username is found
+		if (userlist.containsKey(username)) {
+			// compare the secretkeys
+			if (userlist.get(username).equals(secret)) {
+				cmd = "LOGIN_SUCCESS";
+				info = "logged in as user " + username;
+				con.setUsername(username);
+				con.setSecret(secret);
+				responseMsg(cmd, info, con);
+
+				// get current server load 
+				int currentLoad = loadNum();
+				JSONObject target = null;
+				
+				for (JSONObject jsonAvailabilityObj : announcementInfo) {
+					Long newLoad = (Long) jsonAvailabilityObj.get("load");
+					if (newLoad < (currentLoad - 2)) {
+						target = jsonAvailabilityObj;
+					}
+				}
+				
+				if (target != null) {
+					String newHostName = (String) target.get("hostname");
+					Long newPort = (Long) target.get("port");
+					cmd = "REDIRECT";
+					responseRedirectionMsg(cmd, newHostName, newPort, con);
+					return true;
+				} else {
+					return false;
+				}
+			} else {
+				return loginFailed("secret:"+secret+" not right", con);
+			}
+
+		} else {
+			// If username is not found, login failed
+			return loginFailed("User not found ", con);
+		}
+	}
+	
+	/*
+	 * return login fail msg 
+	 */
+    private boolean loginFailed(String info, Connection con) {
+		responseMsg("LOGIN_FAILED", info, con);
+		connectionClosed(con);
+		return true;
+	}
+	
+	/*
+	 * to define the responseRedirectionMsg
 	 * Method
 	 */
-
 	@SuppressWarnings("unchecked")
 	private void responseRedirectionMsg(String cmd, String hostname, Long port, Connection con) {
 		JSONObject msgObj = new JSONObject();
@@ -495,12 +504,12 @@ public class Control extends Thread {
 				registerFail(username, con);
 				return true;
 			}
-			// file is not existed, create new one
+		// file is not existed, create new one
 		} else {
 			createNewFile();
 		}
 
-		// TODO: send lock request by invoking lockRequest funcion
+		//Send lock request by invoking lockRequest funcion
 		lockRequest(username, secret, con);
 		return false;
 	}
@@ -527,7 +536,7 @@ public class Control extends Thread {
 		String secret = (String) msgObj.get("secret");
 		boolean foundLocalName = false;
 
-		// TODO check local userInfo
+		// Check local userInfo
 		String filename = String.valueOf(Settings.getLocalPort()) + ".json";
 		File f = new File(filename);
 		
@@ -569,7 +578,6 @@ public class Control extends Thread {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-
 			
 			// if this server is the end of the tree, then reply directly
 			Integer outNum = broadcastMessage(con, msgObj.toJSONString(), true);
@@ -578,6 +586,7 @@ public class Control extends Thread {
 				con.writeMsg(msgObj.toJSONString());
 				log.info(msgObj.toJSONString());
 			} else {
+				// add record of this lock request 
 				lockItemArray.add(new LockItem((String) msgObj.get("username"), con, outNum));
 			}
 		}
@@ -614,14 +623,14 @@ public class Control extends Thread {
 				// if this server is the origin lock_request sending server
 				// then should reply the client fail msg
 				if (!item.getOriginCon().getIsServer()) {
-					// TODO: reply client the register fail msg
+					// Reply client the register fail msg
 					registerFail(userName, item.getOriginCon());
 				}
 
 				// remove record item from array
 				lockItemArray.remove(item);
 
-				// TODO: delete the local same username
+				// Delete the local same username
 				String filename = String.valueOf(Settings.getLocalPort()) + ".json";
 				try {
 					Reader in = new FileReader(filename);
@@ -651,12 +660,9 @@ public class Control extends Thread {
 				LockItem item = (LockItem) curItem.get(0);
 				if (item.replyOrginCon()) {
 					if (!item.getOriginCon().getIsServer()) {
-						// TODO: reply the register success message
+						// Reply the register success message
 						String filename = String.valueOf(Settings.getLocalPort()) + ".json";
 						registerSuccess(userName, secret, item.getOriginCon(), filename);
-
-
-						// item.getOriginCon().writeMsg();
 					} else {
 						// reply the origin server the lock allow msg
 						item.getOriginCon().writeMsg(msgObj.toJSONString());
@@ -672,12 +678,8 @@ public class Control extends Thread {
 	/*
 	 * add by yicongLI 19-04-18 broadcast activities
 	 */
-	// modified and finished -- pateli
 	@SuppressWarnings("unchecked")
 	private synchronized boolean activityMessage(Connection con, String message) {
-		// broadcastMessage(con, message, false);
-		// ^^ commented since misplacement -- pateli
-
 		// check invalids
 		JSONObject msgObject = null;
 		JSONObject activity_message = null;
@@ -833,8 +835,9 @@ public class Control extends Thread {
 	 * The connection has been closed by the other party.
 	 */
 	public synchronized void connectionClosed(Connection con) {
-		if (!term)
+		if (!term) {
 			connections.remove(con);
+		}
 	}
 
 	/*
@@ -856,14 +859,9 @@ public class Control extends Thread {
 	public synchronized Connection outgoingConnection(Socket s) throws IOException {
 		log.debug("outgoing connection: " + Settings.socketAddress(s));
 		Connection c = new Connection(s);
-		/*
-		 * add by yicongLI 19-04-18 test msg JSONObject student = new JSONObject();
-		 * student.put("ID", 1); student.put("name", "Mike"); student.put("isEnrolled",
-		 * true); c.writeMsg(student.toJSONString());
-		 */
+
 		connections.add(c);
 		return c;
-
 	}
 
 	@Override

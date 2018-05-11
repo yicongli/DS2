@@ -1,3 +1,7 @@
+/*
+ * The Lock Object to monitor the state of one Lock request 
+ */
+
 package activitystreamer.server;
 
 public class LockItem {
@@ -5,6 +9,7 @@ public class LockItem {
 	// if one server send lock_request originally, then this var store the client connection
 	// otherwise store the receive server connection
 	private Connection originCon; 
+	// the broadcast times
 	private Integer	   outConNumber;
 	
 	public LockItem(String name, Connection con, Integer outNum) {
@@ -21,6 +26,7 @@ public class LockItem {
 		return originCon;
 	}
 	
+	// check if need to reply the lock response to origin connection 
 	public boolean replyOrginCon () {
 		outConNumber --;
 		return outConNumber == 0;
