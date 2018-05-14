@@ -76,6 +76,136 @@ public class Control extends Thread {
 	}
 
 	/*
+	 * sending message functions
+	 */
+
+	/*
+	 * add by yicongLI 19-04-18 send authenticate
+	 */
+	@SuppressWarnings("unchecked")
+	private synchronized void authenticateRequest(Connection outCon) {
+		JSONObject msgObj = new JSONObject();
+		msgObj.put("command", "AUTHENTICATE");
+		msgObj.put("secret", Settings.getServerSecret());
+		outCon.writeMsg(msgObj.toJSONString());
+	}
+
+	/*
+	 * add by yicongLI 23-04-18 broadcast server load state to the other servers
+	 */
+	@SuppressWarnings("unchecked")
+	private synchronized void regularAnnouncement() {
+		String hostname = Settings.getIp();
+		
+
+		JSONObject msgObj = new JSONObject();
+		msgObj.put("command", "SERVER_ANNOUNCE");
+		msgObj.put("id", uniqueID);
+		msgObj.put("load", loadNum());
+		msgObj.put("hostname", hostname);
+		msgObj.put("port", Settings.getLocalPort());
+
+		broadcastMessage(null, msgObj.toJSONString(), true);
+	}
+	
+	/*
+	 * return current load count 
+	 */
+	private synchronized Integer loadNum () {
+		Integer load = 0;
+
+		for (Connection con : connections) {
+			if (!con.getIsServer()) {
+				load++;
+			}
+		}
+		
+		return load;
+	}
+	
+	/*
+	 *  get server info with lowest load
+	 */
+	private JSONObject getRedirectionInfo() {
+		int currentLoad = loadNum();
+		JSONObject target = null;
+		
+		for (JSONObject jsonAvailabilityObj : announcementInfo) {
+			Long newLoad = (Long) jsonAvailabilityObj.get("load");
+			if (newLoad < currentLoad) {
+				// get lowest load server
+				currentLoad = newLoad.intValue();
+				target = jsonAvailabilityObj;
+			}
+		}
+		
+		return target;
+	}
+
+	/*
+	 * add by yicongLI 23-04-18 send lock request when register a new account
+	 */
+	@SuppressWarnings("unchecked")
+	private synchronized void lockRequest(String userName, String secret, Connection clientCon) {
+		JSONObject msgObj = new JSONObject();
+		msgObj.put("command", "LOCK_REQUEST");
+		msgObj.put("username", userName);
+		msgObj.put("secret", secret);
+
+		Integer outNum = broadcastMessage(null, msgObj.toJSONString(), true);
+		
+		// if current server has no connected server, then check local storage directly.
+		if (outNum == 0) {
+			if (FileOperator.checkLocalStorage(userName) != null) {
+				registerFail(userName, clientCon);
+			} else {
+				registerSuccess(userName, secret, clientCon);
+			}
+		}
+		else {
+			lockItemArray.add(new LockItem(userName, clientCon, outNum));
+		}
+	}
+
+	/*
+	 * add by yicongLI 20-04-18 broadcast announcement or activities
+	 * 
+	 * @param con: the connection from which receive the message, if null, then
+	 * broadcast to all the other connections
+	 * 
+	 * @param msg: broadcast message
+	 * 
+	 * @param onlySever: if ture, then just broadcast to the other servers.
+	 */
+	private synchronized Integer broadcastMessage(Connection con, String msg, boolean onlySever) {
+		Integer broadcastTime = 0;
+		for (Connection broadcastCon : connections) {
+
+			// when server to server only, if the connection is client,
+			// then ignore it and check next one
+			if (onlySever && !broadcastCon.getIsServer()) {
+				continue;
+			}
+
+			// if con is equal to null, then broad cast to all connection
+			if (con == null) {
+				broadcastCon.writeMsg(msg);
+				broadcastTime++;
+				continue;
+			}
+
+			String conAddress = Settings.socketAddress(con.getSocket());
+			String broadcastAddress = Settings.socketAddress(broadcastCon.getSocket());
+			if (!conAddress.equals(broadcastAddress)) {
+				broadcastCon.writeMsg(msg);
+				broadcastTime++;
+			}
+		}
+
+		return broadcastTime;
+	}
+	
+	/*
 	 * Processing incoming messages from the connection. Return true if the connection should close.
 	 * mod by yicongLI 19-04-18 add json parsing operation
 	 */
@@ -133,118 +263,6 @@ public class Control extends Thread {
 	}
 
 	/*
-	 * sending message functions
-	 */
-
-	/*
-	 * add by yicongLI 19-04-18 send authenticate
-	 */
-	@SuppressWarnings("unchecked")
-	private synchronized void authenticateRequest(Connection outCon) {
-		JSONObject msgObj = new JSONObject();
-		msgObj.put("command", "AUTHENTICATE");
-		msgObj.put("secret", Settings.getServerSecret());
-		outCon.writeMsg(msgObj.toJSONString());
-	}
-
-	/*
-	 * add by yicongLI 23-04-18 broadcast server load state to the other servers
-	 */
-	@SuppressWarnings("unchecked")
-	private synchronized void regularAnnouncement() {
-		String hostname = Settings.getIp();
-		
-
-		JSONObject msgObj = new JSONObject();
-		msgObj.put("command", "SERVER_ANNOUNCE");
-		msgObj.put("id", uniqueID);
-		msgObj.put("load", loadNum());
-		msgObj.put("hostname", hostname);
-		msgObj.put("port", Settings.getLocalPort());
-
-		broadcastMessage(null, msgObj.toJSONString(), true);
-	}
-	
-	/*
-	 * return current load count 
-	 */
-	private synchronized Integer loadNum () {
-		Integer load = 0;
-
-		for (Connection con : connections) {
-			if (!con.getIsServer()) {
-				load++;
-			}
-		}
-		
-		return load;
-	}
-
-	/*
-	 * add by yicongLI 23-04-18 send lock request when register a new account
-	 */
-	@SuppressWarnings("unchecked")
-	private synchronized void lockRequest(String userName, String secret, Connection clientCon) {
-		JSONObject msgObj = new JSONObject();
-		msgObj.put("command", "LOCK_REQUEST");
-		msgObj.put("username", userName);
-		msgObj.put("secret", secret);
-
-		Integer outNum = broadcastMessage(null, msgObj.toJSONString(), true);
-		
-		// if current server has no connected server, then check local storage directly.
-		if (outNum == 0) {
-			if (FileOperator.checkLocalStorage(userName) != null) {
-				registerFail(userName, clientCon);
-			}
-			else {
-				registerSuccess(userName, secret, clientCon);
-			}
-		}
-		else {
-			lockItemArray.add(new LockItem(userName, clientCon, outNum));
-		}
-	}
-
-	/*
-	 * add by yicongLI 20-04-18 broadcast announcement or activities
-	 * 
-	 * @param con: the connection from which receive the message, if null, then
-	 * broadcast to all the other connections
-	 * 
-	 * @param msg: broadcast message
-	 * 
-	 * @param onlySever: if ture, then just broadcast to the other servers.
-	 */
-	private synchronized Integer broadcastMessage(Connection con, String msg, boolean onlySever) {
-		Integer broadcastTime = 0;
-		for (Connection broadcastCon : connections) {
-
-			// when server to server only, if the connection is client,
-			// then ignore it and check next one
-			if (onlySever && !broadcastCon.getIsServer()) {
-				continue;
-			}
-
-			// if con is equal to null, then broad cast to all connection
-			if (con == null) {
-				broadcastCon.writeMsg(msg);
-				broadcastTime++;
-				continue;
-			}
-
-			String conAddress = Settings.socketAddress(con.getSocket());
-			String broadcastAddress = Settings.socketAddress(broadcastCon.getSocket());
-			if (!conAddress.equals(broadcastAddress)) {
-				broadcastCon.writeMsg(msg);
-				broadcastTime++;
-			}
-		}
-
-		return broadcastTime;
-	}
-
-	/*
 	 * received message response functions
 	 */
 
@@ -297,29 +315,16 @@ public class Control extends Thread {
 			responseMsg(cmd, info, con);
 
 			// get current server load 
-			int currentLoad = loadNum();
-			JSONObject target = null;
-			
-			for (JSONObject jsonAvailabilityObj : announcementInfo) {
-				Long newLoad = (Long) jsonAvailabilityObj.get("load");
-				if (newLoad < (currentLoad - 2)) {
-					target = jsonAvailabilityObj;
-				}
-			}
-			
+			JSONObject target = getRedirectionInfo();
 			if (target != null) {
-				String newHostName = (String) target.get("hostname");
-				Long newPort = (Long) target.get("port");
-				cmd = "REDIRECT";
-				responseRedirectionMsg(cmd, newHostName, newPort, con);
+				responseRedirectionMsg(target, con);
 				return true;
-			} else {
-				return false;
-			}
-
+			} 
 		} else {
 			return loginFailed("User"+username+" not found or secret: "+secret+" not right", con);
 		}
+		
+		return false;
 	}
 	
 	/*
@@ -336,11 +341,14 @@ public class Control extends Thread {
 	 * Method
 	 */
 	@SuppressWarnings("unchecked")
-	private void responseRedirectionMsg(String cmd, String hostname, Long port, Connection con) {
+	private void responseRedirectionMsg(JSONObject oldObj, Connection con) {
+		String newHostName = (String) oldObj.get("hostname");
+		Long newPort = (Long) oldObj.get("port");
+		
 		JSONObject msgObj = new JSONObject();
-		msgObj.put("command", cmd);
-		msgObj.put("hostname", hostname);
-		msgObj.put("port", port);
+		msgObj.put("command", "REDIRECT");
+		msgObj.put("hostname", newHostName);
+		msgObj.put("port", newPort);
 		con.writeMsg(msgObj.toJSONString());
 	}
 
@@ -417,10 +425,11 @@ public class Control extends Thread {
 			registerFail(username, con);
 			return true;
 		} 
-
-		//Send lock request by invoking lockRequest function
-		lockRequest(username, secret, con);
-		return false;
+		else {
+			//Send lock request by invoking lockRequest function
+			lockRequest(username, secret, con);
+			return false;
+		}
 	}
 
 	/*
