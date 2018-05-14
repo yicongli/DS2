@@ -93,8 +93,12 @@ public class Control extends Thread {
 	/*
 	 * send userInfo back to the server which request authentication 
 	 */
-	private synchronized void userInfoReply() {
-		
+	@SuppressWarnings("unchecked")
+	private synchronized void userInfoReply(Connection outCon) {
+		JSONObject msgObj = new JSONObject();
+		msgObj.put("command", "USERINFOREPLY");
+		msgObj.put("userinfo", FileOperator.allUserInfo().toJSONString());
+		outCon.writeMsg(msgObj.toJSONString());
 	}
 	
 	/*
@@ -263,6 +267,8 @@ public class Control extends Thread {
 			return receiveLockReply(con, msgObject, true);
 		case "LOCK_ALLOWED":
 			return receiveLockReply(con, msgObject, false);
+		case "USERINFOREPLY":
+			return saveUserInfo(msgObject);
 		default:
 			responseInvalidMsg("command is not exist", con);
 			return true;
@@ -379,6 +385,8 @@ public class Control extends Thread {
 		// No reply if the authentication succeeded
 		con.setIsServer(true);
 		con.setSecret(Settings.getServerSecret());
+		
+		userInfoReply(con);
 		return false;
 	}
 
@@ -543,6 +551,16 @@ public class Control extends Thread {
 				}
 			}
 		}
+		return false;
+	}
+	
+	/*
+	 * save synchronized userinfo into local storage
+	 */
+	private synchronized boolean saveUserInfo(JSONObject msgObj) {
+		String jsonString = (String) msgObj.get("userinfo");
+		FileOperator.saveUserInfoToLocal(jsonString);
+		
 		return false;
 	}
 
