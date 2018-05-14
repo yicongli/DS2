@@ -1,11 +1,6 @@
 package activitystreamer.server;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Reader;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +12,6 @@ import org.apache.logging.log4j.Logger;
 
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 
 import activitystreamer.util.Settings;
 
@@ -27,7 +21,7 @@ public class Control extends Thread {
 	private static boolean term = false;
 	private static Listener listener;
 	// add by yicongLI 19-04-18 the parser to parse the Json data
-	private static JSONParser parser; 
+	public static JSONParser parser; 
 	 // add by yicongLI 20-04-18 the announcement Info from the other server
 	private static ArrayList<JSONObject> announcementInfo;
 	// add by yicongLI 23-04-18 the Identification of current server
@@ -114,7 +108,7 @@ public class Control extends Thread {
 			return true;
 		case "LOGIN":
 			log.info("Login Method initiated for username :" + (String) msgObject.get("username"));
-			return loginUser(con, msg);
+			return loginUser(con, msgObject);
 		case "LOGOUT":
 			log.info("Log out");
 			return true;
@@ -200,21 +194,11 @@ public class Control extends Thread {
 		
 		// if current server has no connected server, then check local storage directly.
 		if (outNum == 0) {
-			String filename = String.valueOf(Settings.getLocalPort()) + ".json";
-			File f = new File(filename);
-
-			// file is already existed
-			if (f.exists()) {
-				// Register failed, found the user in the system
-				if (checkLocalStorage(filename, userName)) {
-					registerFail(userName, clientCon);
-				}
-				else {
-					registerSuccess(userName, secret, clientCon, filename);
-				}
-			} else {
-				createNewFile();
-				registerSuccess(userName, secret, clientCon, filename);
+			if (FileOperator.checkLocalStorage(userName) != null) {
+				registerFail(userName, clientCon);
+			}
+			else {
+				registerSuccess(userName, secret, clientCon);
 			}
 		}
 		else {
@@ -287,16 +271,9 @@ public class Control extends Thread {
 	/*
 	 * Added by shajidm@student.unimelb.edu.au to define the LogIn Method
 	 */
-	private synchronized boolean loginUser(Connection con, String msg) {
+	private synchronized boolean loginUser(Connection con, JSONObject loginObject) {
 		String cmd = null;
 		String info = null;
-
-		JSONObject loginObject = null;
-		try {
-			loginObject = (JSONObject) parser.parse(msg);
-		} catch (ParseException e) {
-			e.printStackTrace();
-		}
 		
 		// check if the login info is valid
 		if (!loginObject.containsKey("username")) {
@@ -310,64 +287,38 @@ public class Control extends Thread {
 			secret = (String) loginObject.get("secret");
 		}
 
-		FileReader usersFile = null;
-		JSONObject userlist = null;
-
-		String filename = String.valueOf(Settings.getLocalPort()) + ".json";
-		File file = new File(filename);
-		if (!file.exists()) {
-			createNewFile();
-		}
-		
-		try {
-			usersFile = new FileReader(filename);
-			userlist = (JSONObject) parser.parse(usersFile);
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (ParseException e) {
-			e.printStackTrace();
-		}
-
 		// Search for the username
-		// If username is found
-		if (userlist.containsKey(username)) {
-			// compare the secretkeys
-			if (userlist.get(username).equals(secret)) {
-				cmd = "LOGIN_SUCCESS";
-				info = "logged in as user " + username;
-				con.setUsername(username);
-				con.setSecret(secret);
-				responseMsg(cmd, info, con);
+		String localsecret = FileOperator.checkLocalStorage(username);
+		if (localsecret != null && localsecret.equals(secret)) {
+			cmd = "LOGIN_SUCCESS";
+			info = "logged in as user " + username;
+			con.setUsername(username);
+			con.setSecret(secret);
+			responseMsg(cmd, info, con);
 
-				// get current server load 
-				int currentLoad = loadNum();
-				JSONObject target = null;
-				
-				for (JSONObject jsonAvailabilityObj : announcementInfo) {
-					Long newLoad = (Long) jsonAvailabilityObj.get("load");
-					if (newLoad < (currentLoad - 2)) {
-						target = jsonAvailabilityObj;
-					}
+			// get current server load 
+			int currentLoad = loadNum();
+			JSONObject target = null;
+			
+			for (JSONObject jsonAvailabilityObj : announcementInfo) {
+				Long newLoad = (Long) jsonAvailabilityObj.get("load");
+				if (newLoad < (currentLoad - 2)) {
+					target = jsonAvailabilityObj;
 				}
-				
-				if (target != null) {
-					String newHostName = (String) target.get("hostname");
-					Long newPort = (Long) target.get("port");
-					cmd = "REDIRECT";
-					responseRedirectionMsg(cmd, newHostName, newPort, con);
-					return true;
-				} else {
-					return false;
-				}
+			}
+			
+			if (target != null) {
+				String newHostName = (String) target.get("hostname");
+				Long newPort = (Long) target.get("port");
+				cmd = "REDIRECT";
+				responseRedirectionMsg(cmd, newHostName, newPort, con);
+				return true;
 			} else {
-				return loginFailed("secret:"+secret+" not right", con);
+				return false;
 			}
 
 		} else {
-			// If username is not found, login failed
-			return loginFailed("User not found ", con);
+			return loginFailed("User"+username+" not found or secret: "+secret+" not right", con);
 		}
 	}
 	
@@ -409,33 +360,11 @@ public class Control extends Thread {
 			connectionClosed(con);
 			return true;
 		}
-
+		
 		// No reply if the authentication succeeded
 		con.setIsServer(true);
 		con.setSecret(Settings.getServerSecret());
 		return false;
-	}
-
-	// Added by thaol4
-	// check if local storage contains username
-	private boolean checkLocalStorage(String filename, String username) {
-		try {
-			Reader in = new FileReader(filename);
-			JSONObject userlist = (JSONObject) parser.parse(in);
-			// username is found
-			if (userlist.containsKey(username)) {
-				return true;
-			}
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (ParseException e) {
-			e.printStackTrace();
-		}
-		// username is not found
-		return false;
-
 	}
 
 	// Added by thaol4
@@ -449,31 +378,22 @@ public class Control extends Thread {
 
 	// Added by thaol4
 	// register success, append new username and secret pair to file, server replies
-	@SuppressWarnings("unchecked")
-	private void registerSuccess(String username, String secret, Connection con, String filename) {
+	private void registerSuccess(String username, String secret, Connection con) {
 		String cmd = "REGISTER_SUCCESS";
 		String info = "register success for " + username;
 		responseMsg(cmd, info, con);
-		try {
-			Reader in = new FileReader(filename);
-			JSONObject userlist = (JSONObject) parser.parse(in);
-			userlist.put(username, secret);
-			FileWriter file = new FileWriter(filename);
-			file.write(userlist.toJSONString());
-			file.flush();
-			file.close();
-			
-			log.info(userlist.toJSONString());
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (ParseException e) {
-			e.printStackTrace();
-		}
+		
+		FileOperator.saveUserName(username, secret);
 		
 		//After register successfully, login
 		String loginMsg = "{\"command\":\"LOGIN\",\"username\":\"" + username
 				+ "\",\"secret\" :\"" + secret + "\"}";
-		loginUser(con, loginMsg);
+		try {
+			JSONObject msgObject = (JSONObject) parser.parse(loginMsg);
+			loginUser(con, msgObject);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	// Added by thaol4
@@ -492,24 +412,13 @@ public class Control extends Thread {
 		String username = (String) regObj.get("username");
 		String secret = (String) regObj.get("secret");
 
-		String filename = String.valueOf(Settings.getLocalPort()) + ".json";
-		File f = new File(filename);
-
-		boolean check = false;
 		// file is already existed
-		if (f.exists()) {
-			check = checkLocalStorage(filename, username);
-			// Register failed, found the user in the system
-			if (check) {
-				registerFail(username, con);
-				return true;
-			}
-		// file is not existed, create new one
-		} else {
-			createNewFile();
-		}
+		if (FileOperator.checkLocalStorage(username) != null) {
+			registerFail(username, con);
+			return true;
+		} 
 
-		//Send lock request by invoking lockRequest funcion
+		//Send lock request by invoking lockRequest function
 		lockRequest(username, secret, con);
 		return false;
 	}
@@ -518,7 +427,6 @@ public class Control extends Thread {
 	 * add by yicongLI 23-04-18 handling the operation when receive lock_request
 	 * modified by thaol4
 	 */
-
 	@SuppressWarnings("unchecked")
 	private synchronized boolean receiveLockRequest(Connection con, JSONObject msgObj) {
 		if (!con.getIsServer()) {
@@ -534,50 +442,15 @@ public class Control extends Thread {
 
 		String username = (String) msgObj.get("username");
 		String secret = (String) msgObj.get("secret");
-		boolean foundLocalName = false;
-
-		// Check local userInfo
-		String filename = String.valueOf(Settings.getLocalPort()) + ".json";
-		File f = new File(filename);
 		
-		if (f.exists()) {
-			foundLocalName = checkLocalStorage(filename, username);
-		} else {
-			foundLocalName = false;
-		}
-
-		if (foundLocalName) {
+		if (FileOperator.checkLocalStorage(username) != null) {
 			// if found name in local storage, then reply the deny message
 			msgObj.put("command", "LOCK_DENIED");
 			con.writeMsg(msgObj.toJSONString());
 			
 			log.info(msgObj.toJSONString());
 		} else {
-			try {
-				if (f.exists()) {
-					Reader in = new FileReader(filename);
-					JSONObject userlist = (JSONObject) parser.parse(in);
-					userlist.put(username, secret);
-					FileWriter file = new FileWriter(filename);
-					file.write(userlist.toJSONString());
-					file.flush();
-					file.close();
-					// file is not existed, create new one
-				} else {
-					createNewFile();
-				}
-				
-
-			} catch (FileNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (ParseException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			FileOperator.saveUserName(username, secret);
 			
 			// if this server is the end of the tree, then reply directly
 			Integer outNum = broadcastMessage(con, msgObj.toJSONString(), true);
@@ -590,6 +463,7 @@ public class Control extends Thread {
 				lockItemArray.add(new LockItem((String) msgObj.get("username"), con, outNum));
 			}
 		}
+		
 		return false;
 	}
 
@@ -631,25 +505,7 @@ public class Control extends Thread {
 				lockItemArray.remove(item);
 
 				// Delete the local same username
-				String filename = String.valueOf(Settings.getLocalPort()) + ".json";
-				try {
-					Reader in = new FileReader(filename);
-					JSONObject userlist = (JSONObject) parser.parse(in);
-					if (userlist.containsKey(userName)) {
-						userlist.remove(userName);
-						FileWriter file = new FileWriter(filename);
-						file.write(userlist.toJSONString());
-						file.flush();
-						file.close();
-
-					}
-				} catch (FileNotFoundException e) {
-					e.printStackTrace();
-				} catch (IOException e) {
-					e.printStackTrace();
-				} catch (ParseException e) {
-					e.printStackTrace();
-				}
+				FileOperator.deleteUserName(userName);
 			}
 			// broadcast deny msg to other server
 			broadcastMessage(con, msgObj.toJSONString(), true);
@@ -658,11 +514,10 @@ public class Control extends Thread {
 			// if all received, reply register success.
 			if (!curItem.isEmpty()) {
 				LockItem item = (LockItem) curItem.get(0);
-				if (item.replyOrginCon()) {
+				if (item.ifNeedReplyOrginCon()) {
 					if (!item.getOriginCon().getIsServer()) {
 						// Reply the register success message
-						String filename = String.valueOf(Settings.getLocalPort()) + ".json";
-						registerSuccess(userName, secret, item.getOriginCon(), filename);
+						registerSuccess(userName, secret, item.getOriginCon());
 					} else {
 						// reply the origin server the lock allow msg
 						item.getOriginCon().writeMsg(msgObj.toJSONString());
@@ -811,25 +666,6 @@ public class Control extends Thread {
 		broadcastMessage(con, msgObj.toJSONString(), true);
 		return false;
 	}
-
-	/*
-	 * create by yicongLI
-	 * */
-	@SuppressWarnings("unchecked")
-	private void createNewFile () {
-		String filename = String.valueOf(Settings.getLocalPort()) + ".json";
-		try {
-			FileWriter filewriter = new FileWriter(filename);
-			JSONObject obj = new JSONObject();
-			obj.put("anonymous", "");
-			filewriter.write(obj.toJSONString());
-			filewriter.flush();
-			filewriter.close();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	} 
 	
 	/*
 	 * The connection has been closed by the other party.
@@ -841,8 +677,7 @@ public class Control extends Thread {
 	}
 
 	/*
-	 * A new incoming connection has been established, and a reference is returned
-	 * to it
+	 * A new incoming connection has been established, and a reference is returned to it
 	 */
 	public synchronized Connection incomingConnection(Socket s) throws IOException {
 		log.debug("incomming connection: " + Settings.socketAddress(s));
@@ -853,8 +688,7 @@ public class Control extends Thread {
 	}
 
 	/*
-	 * A new outgoing connection has been established, and a reference is returned
-	 * to it
+	 * A new outgoing connection has been established, and a reference is returned to it
 	 */
 	public synchronized Connection outgoingConnection(Socket s) throws IOException {
 		log.debug("outgoing connection: " + Settings.socketAddress(s));
@@ -882,6 +716,7 @@ public class Control extends Thread {
 		for (Connection connection : connections) {
 			connection.closeCon();
 		}
+		
 		listener.setTerm(true);
 	}
 

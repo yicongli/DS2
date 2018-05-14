@@ -25,7 +25,7 @@ public class Connection extends Thread {
 	private Socket socket;
 	private boolean term=false;
 	// add by yicongLI 20-04-18 
-	// the flag to indicate if the connection is client, defualt is not sever
+	// the flag to indicate if the connection is client, default is not sever
 	private boolean isServer = false; 
 	// store the username for logged in client
 	private String username = ""; 

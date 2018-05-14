@@ -27,7 +27,7 @@ public class LockItem {
 	}
 	
 	// check if need to reply the lock response to origin connection 
-	public boolean replyOrginCon () {
+	public boolean ifNeedReplyOrginCon () {
 		outConNumber --;
 		return outConNumber == 0;
 	}
