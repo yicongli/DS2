@@ -27,20 +27,10 @@ public class FileOperator {
 	 * save user name and password
 	 */
 	@SuppressWarnings("unchecked")
-	public static synchronized boolean saveUserName(String name, String password) {
-		try {
-			FileWriter filewriter = new FileWriter(FileOperator.fileName);
-			JSONObject obj = new JSONObject();
-			obj.put(name, password);
-			filewriter.write(obj.toJSONString());
-			filewriter.flush();
-			filewriter.close();
-			
-			return true;
-		} catch (IOException e) {
-			e.printStackTrace();
-			return false;
-		}
+	public static synchronized void saveUserName(String name, String password) {
+		JSONObject obj = allUserInfo();
+		obj.put(name, password);
+		saveUserInfoToLocal(obj.toJSONString());
 	}
 	
 	/*
@@ -48,24 +38,12 @@ public class FileOperator {
 	 * delete user name
 	 */
 	public static synchronized boolean deleteUserName(String name) {
-		try {
-			Reader in = new FileReader(FileOperator.fileName);
-			JSONObject userlist = (JSONObject) Control.parser.parse(in);
-			if (userlist.containsKey(name)) {
-				userlist.remove(name);
-				FileWriter file = new FileWriter(FileOperator.fileName);
-				file.write(userlist.toJSONString());
-				file.flush();
-				file.close();
-				
-				return true;
-			}
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (ParseException e) {
-			e.printStackTrace();
+		JSONObject userlist = allUserInfo();
+		if (userlist.containsKey(name)) {
+			userlist.remove(name);
+			saveUserInfoToLocal(userlist.toJSONString());
+			
+			return true;
 		}
 		
 		return false;
@@ -74,24 +52,15 @@ public class FileOperator {
 	// Added by thaol4
 	// check if local storage contains username
 	public static synchronized String checkLocalStorage(String username) {
-		if (!FileOperator.checkFileExist()) {
-			FileOperator.createNewFile();
+		if (!checkFileExist()) {
+			createNewFile();
 			return username.equalsIgnoreCase("anonymous") ? "" : null;
 		}
 		
-		try {
-			Reader in = new FileReader(FileOperator.fileName);
-			JSONObject userlist = (JSONObject) Control.parser.parse(in);
-			// username is found
-			if (userlist.containsKey(username)) {
-				return (String)userlist.get(username);
-			}
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (ParseException e) {
-			e.printStackTrace();
+		JSONObject userlist = allUserInfo();
+		// username is found
+		if (userlist.containsKey(username)) {
+			return (String)userlist.get(username);
 		}
 		
 		// username is not found
@@ -104,5 +73,40 @@ public class FileOperator {
 	public static synchronized boolean checkFileExist() {
 		File f = new File(FileOperator.fileName);
 		return f.exists();
+	}
+	
+	/*
+	 * get all user info 
+	 */
+	public static synchronized JSONObject allUserInfo() {
+		try {
+			Reader in = new FileReader(FileOperator.fileName);
+			JSONObject userlist = (JSONObject) Control.parser.parse(in);
+			return userlist;
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+		
+		return new JSONObject();
+	}
+	
+	/*
+	 * write user info to local file 
+	 */
+	public static synchronized void saveUserInfoToLocal (String jsonString) {
+		try {
+			FileWriter file = new FileWriter(FileOperator.fileName);
+			file.write(jsonString);
+			file.flush();
+			file.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} 
 	}
 }

@@ -89,7 +89,14 @@ public class Control extends Thread {
 		msgObj.put("secret", Settings.getServerSecret());
 		outCon.writeMsg(msgObj.toJSONString());
 	}
-
+	
+	/*
+	 * send userInfo back to the server which request authentication 
+	 */
+	private synchronized void userInfoReply() {
+		
+	}
+	
 	/*
 	 * add by yicongLI 23-04-18 broadcast server load state to the other servers
 	 */
@@ -132,7 +139,7 @@ public class Control extends Thread {
 		
 		for (JSONObject jsonAvailabilityObj : announcementInfo) {
 			Long newLoad = (Long) jsonAvailabilityObj.get("load");
-			if (newLoad < currentLoad) {
+			if (newLoad < currentLoad - 1) {
 				// get lowest load server
 				currentLoad = newLoad.intValue();
 				target = jsonAvailabilityObj;
