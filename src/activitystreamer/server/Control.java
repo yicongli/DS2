@@ -3,6 +3,7 @@ package activitystreamer.server;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -132,25 +133,6 @@ public class Control extends Thread {
 		}
 		
 		return load;
-	}
-	
-	/*
-	 *  get server info with lowest load
-	 */
-	private JSONObject getRedirectionInfo() {
-		int currentLoad = loadNum();
-		JSONObject target = null;
-		
-		for (JSONObject jsonAvailabilityObj : announcementInfo) {
-			Long newLoad = (Long) jsonAvailabilityObj.get("load");
-			if (newLoad < currentLoad - 1) {
-				// get lowest load server
-				currentLoad = newLoad.intValue();
-				target = jsonAvailabilityObj;
-			}
-		}
-		
-		return target;
 	}
 
 	/*
@@ -327,17 +309,10 @@ public class Control extends Thread {
 			con.setSecret(secret);
 			responseMsg(cmd, info, con);
 
-			// get current server load 
-			JSONObject target = getRedirectionInfo();
-			if (target != null) {
-				responseRedirectionMsg(target, con);
-				return true;
-			} 
+			return redirectionLogin(con);
 		} else {
 			return loginFailed("User"+username+" not found or secret: "+secret+" not right", con);
 		}
-		
-		return false;
 	}
 	
 	/*
@@ -349,20 +324,64 @@ public class Control extends Thread {
 		return true;
 	}
 	
+    /*
+     * check redirect once 5 seconds, redirect one client a time
+     */
+	private void checkRedirection () {
+		Connection redirectCon = null;
+		for (Connection curCon : connections) {
+			if (!curCon.getIsServer()) {
+				if (redirectionLogin(curCon)) {
+					redirectCon = curCon;
+				}
+			}
+		}
+		
+		if (redirectCon != null) {
+			connectionClosed(redirectCon);
+		}
+	}
+    
 	/*
-	 * to define the responseRedirectionMsg
-	 * Method
+	 * to define the redirectionLogin
 	 */
 	@SuppressWarnings("unchecked")
-	private void responseRedirectionMsg(JSONObject oldObj, Connection con) {
-		String newHostName = (String) oldObj.get("hostname");
-		Long newPort = (Long) oldObj.get("port");
+	private boolean redirectionLogin(Connection con) {
+		// get current server load 
+		JSONObject target = getRedirectionInfo();
+		if (target == null) {
+			return false;
+		} 
+		
+		String newHostName = (String) target.get("hostname");
+		Long newPort = (Long) target.get("port");
 		
 		JSONObject msgObj = new JSONObject();
 		msgObj.put("command", "REDIRECT");
 		msgObj.put("hostname", newHostName);
 		msgObj.put("port", newPort);
 		con.writeMsg(msgObj.toJSONString());
+		
+		return true;
+	}
+	
+	/*
+	 *  get server info with lowest load
+	 */
+	private JSONObject getRedirectionInfo() {
+		int currentLoad = loadNum();
+		JSONObject target = null;
+		
+		for (JSONObject jsonAvailabilityObj : announcementInfo) {
+			Long newLoad = (Long) jsonAvailabilityObj.get("load");
+			if (newLoad < currentLoad - 1) {
+				// get lowest load server
+				currentLoad = newLoad.intValue();
+				target = jsonAvailabilityObj;
+			}
+		}
+		
+		return target;
 	}
 
 	/*
@@ -608,6 +627,7 @@ public class Control extends Thread {
 			JSONObject msgObjFinal = new JSONObject();
 			msgObjFinal.put("command", "ACTIVITY_BROADCAST");
 			msgObjFinal.put("activity", activity_message);
+			msgObjFinal.put("timestamp", new Date().toString());
 
 			broadcastMessage(con, msgObjFinal.toJSONString(), false);
 			
@@ -707,6 +727,7 @@ public class Control extends Thread {
 	public synchronized void connectionClosed(Connection con) {
 		if (!term) {
 			connections.remove(con);
+			con.closeCon();
 		}
 	}
 
@@ -739,6 +760,8 @@ public class Control extends Thread {
 			// do something with 5 second intervals in between
 			try {
 				regularAnnouncement(); // add by yicongLI 23-04-18 start regular announcement
+				checkRedirection(); // check redirection and redirect one client.
+				
 				Thread.sleep(Settings.getActivityInterval());
 			} catch (InterruptedException e) {
 				log.info("received an interrupt, system is shutting down");
