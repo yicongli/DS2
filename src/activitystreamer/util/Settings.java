@@ -25,7 +25,7 @@ public class Settings {
 	private static String username = "anonymous";
 	
 	private static String parentHostNameOfRemote = "";
-	private static String parentPortOfRemote = "";
+	private static int parentPortOfRemote = 0;
 
 	
 	public static int getLocalPort() {
@@ -113,11 +113,11 @@ public class Settings {
 		Settings.parentHostNameOfRemote = parentHostName;
 	}
 
-	public static String getParentPortOfRemote() {
+	public static int getParentPortOfRemote() {
 		return parentPortOfRemote;
 	}
 
-	public static void setParentPortOfRemote(String parentPort) {
+	public static void setParentPortOfRemote(int parentPort) {
 		Settings.parentPortOfRemote = parentPort;
 	}
 

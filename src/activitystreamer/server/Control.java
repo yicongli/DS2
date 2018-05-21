@@ -629,7 +629,8 @@ public class Control extends Thread {
 		userManager.setLogoutUserInfos(arrayList);
 		
 		Settings.setParentHostNameOfRemote((String) msgObj.get("parenthostname"));
-		Settings.setParentPortOfRemote((String) msgObj.get("parentport"));
+		Long portNum = (Long)msgObj.get("parentport");
+		Settings.setParentPortOfRemote(portNum.intValue());
 		
 		return false;
 	}
