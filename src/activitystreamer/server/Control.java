@@ -90,7 +90,7 @@ public class Control extends Thread {
 	 */
 
 	/*
-	 * add by yicongLI 19-04-18 send authenticate
+	 * add by yicongLI 19-04-18 send authenticate: S-S 
 	 */
 	@SuppressWarnings("unchecked")
 	private synchronized void authenticateRequest(Connection outCon) {
@@ -101,7 +101,7 @@ public class Control extends Thread {
 	}
 	
 	/*
-	 * send userInfo back to the server which request authentication 
+	 * send userInfo back to the server which request authentication: S-S 
 	 */
 	@SuppressWarnings("unchecked")
 	private synchronized void userInfoReply(Connection outCon) {
@@ -669,7 +669,7 @@ public class Control extends Thread {
 		String userName = (String) msgObject.get("username");
 		String secret = (String) msgObject.get("secret");
 		
-		int latestIndex = userManager.shoudAuthenticateUser(userName, secret, con);
+		int latestIndex = userManager.shouldAuthenticateUser(userName, secret, con);
 		if (latestIndex != -1)  {
 			activity_message.put("authenticated_user", userName);
 			

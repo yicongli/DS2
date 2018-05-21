@@ -40,7 +40,7 @@ public class UserManager {
 	/*
 	 * add by yicongLI check if can operate authentication
 	 * */
-	public int shoudAuthenticateUser (String username, String secret, Connection con) {
+	public int shouldAuthenticateUser (String username, String secret, Connection con) {
 		int latestIndex = -1;
 		for (LoginUserInfo userInfo : getLoginUserInfos()) {
 			if (userInfo.getUsername().equals(username) 
