@@ -1,3 +1,7 @@
+/* Read and write to json file (local storage of the servers)
+ */
+
+
 package activitystreamer.server;
 
 import java.io.File;
