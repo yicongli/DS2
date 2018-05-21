@@ -18,8 +18,13 @@ public class FileOperator {
 	 * create by yicongLI 14-05-2018
 	 * create new User file
 	 */
-	public static void createNewFile () {
-		saveUserName("anonymous", "");
+	public static void createNewFile (File f) {
+		try {
+			f.createNewFile();
+			saveUserName("anonymous", "");
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	} 
 	
 	/*
@@ -52,8 +57,9 @@ public class FileOperator {
 	// Added by thaol4
 	// check if local storage contains username
 	public static synchronized String checkLocalStorage(String username) {
-		if (!checkFileExist()) {
-			createNewFile();
+		File f = new File(FileOperator.fileName);
+		if (!f.exists()) {
+			createNewFile(f);
 			return username.equalsIgnoreCase("anonymous") ? "" : null;
 		}
 		
@@ -65,14 +71,6 @@ public class FileOperator {
 		
 		// username is not found
 		return null;
-	}
-	
-	/*
-	 * check file exist 
-	 */
-	public static synchronized boolean checkFileExist() {
-		File f = new File(FileOperator.fileName);
-		return f.exists();
 	}
 	
 	/*
