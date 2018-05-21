@@ -16,7 +16,6 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 import activitystreamer.util.Settings;
@@ -28,7 +27,6 @@ public class Control extends Thread {
 	private static Listener listener;
 	// add by yicongLI 19-04-18 the parser to parse the Json data
 	public static JSONParser parser; 
-	public static GsonBuilder gsonBuilder;
 	
 	 // add by yicongLI 20-04-18 the announcement Info from the other server
 	private static ArrayList<JSONObject> announcementInfo;
@@ -55,7 +53,6 @@ public class Control extends Thread {
 		lockItemArray 	= new ArrayList<LockItem>();
 		userManager 	= new UserManager();
 		parser 			= new JSONParser(); // add by yicongLI 19-04-18 initialise parser and remote connection
-		gsonBuilder 	= new GsonBuilder();
 		uniqueID 		= Settings.nextSecret();
 		// start a listener
 		try {
@@ -114,7 +111,7 @@ public class Control extends Thread {
 		msgObj.put("parentport", Settings.getRemotePort());
 		msgObj.put("userinfo", FileOperator.allUserInfo().toJSONString());
 		
-		Gson logoutUser = gsonBuilder.create();
+		Gson logoutUser = new Gson();
 		logoutUser.toJson(userManager.getLogoutUserInfos());
 		msgObj.put("logoutUserInfos", logoutUser.toString());
 		
@@ -128,7 +125,6 @@ public class Control extends Thread {
 	private synchronized void regularAnnouncement() {
 		String hostname = Settings.getIp();
 		
-
 		JSONObject msgObj = new JSONObject();
 		msgObj.put("command", "SERVER_ANNOUNCE");
 		msgObj.put("id", uniqueID);
@@ -136,8 +132,33 @@ public class Control extends Thread {
 		msgObj.put("hostname", hostname);
 		msgObj.put("port", Settings.getLocalPort());
 		
+		// put children server address info into announcement
+		Gson childrenServerInfo = new Gson();
+		childrenServerInfo.toJson(childrenServerInfo());
+		msgObj.put("children", childrenServerInfo.toString());
+		
 		broadcastMessage(null, msgObj.toJSONString(), true);
 	}
+	
+	/*
+	 * get all children server IP address info
+	 */
+	@SuppressWarnings("unchecked")
+	private synchronized ArrayList<JSONObject> childrenServerInfo () {
+		ArrayList<JSONObject> childrenInfo = new ArrayList<JSONObject>();
+		for (Connection con : connections) {
+			if (con.getIsServer() && !con.isParentServer()) {
+				JSONObject info = new JSONObject();
+				info.put("hostname", con.getSocket().getInetAddress());
+				info.put("port", con.getSocket().getPort());
+				
+				childrenInfo.add(info);
+			}
+		}
+		
+		return childrenInfo;
+	}
+	
 	
 	/*
 	 * return current load count 
