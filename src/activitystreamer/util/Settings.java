@@ -14,15 +14,18 @@ import org.apache.logging.log4j.Logger;
 public class Settings {
 	private static final Logger log = LogManager.getLogger();
 	private static SecureRandom random = new SecureRandom();
-	private static int localPort = 3781; 
+	private static int localPort = 3780; 
 	private static String localHostname = "localhost";
 	//private static String remoteHostname = "43.240.97.243";
-	private static String remoteHostname = "localhost";
+	private static String remoteHostname = null;//"localhost";
 	private static int remotePort = 3780;
 	private static int activityInterval = 5000; // milliseconds
 	private static String userSecret = "";
 	private static String serverSecret = " gen1p85md2qnq0d59qll3fbcoa";
 	private static String username = "anonymous";
+	
+	private static String parentHostNameOfRemote = "";
+	private static String parentPortOfRemote = "";
 
 	
 	public static int getLocalPort() {
@@ -102,6 +105,22 @@ public class Settings {
 	 * some general helper functions
 	 */
 	
+	public static String getParentHostNameOfRemote() {
+		return parentHostNameOfRemote;
+	}
+
+	public static void setParentHostNameOfRemote(String parentHostName) {
+		Settings.parentHostNameOfRemote = parentHostName;
+	}
+
+	public static String getParentPortOfRemote() {
+		return parentPortOfRemote;
+	}
+
+	public static void setParentPortOfRemote(String parentPort) {
+		Settings.parentPortOfRemote = parentPort;
+	}
+
 	public static String socketAddress(Socket socket){
 		return socket.getInetAddress()+":"+socket.getPort();
 	}

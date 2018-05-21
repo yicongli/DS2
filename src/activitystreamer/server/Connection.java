@@ -27,7 +27,9 @@ public class Connection extends Thread {
 	// add by yicongLI 20-04-18 
 	// the flag to indicate if the connection is client, default is not sever
 	private boolean isServer = false; 
-	// store the secrete for Server and client
+	// indicate if the connection is the parent server of current server
+	private boolean isParentServer = false;
+	// store the secrete for Server
 	private String secrete  = ""; 
 	
 	Connection(Socket socket) throws IOException{
@@ -113,5 +115,13 @@ public class Connection extends Thread {
 	
 	public void setSecret (String se) {
 		secrete = se;
+	}
+
+	public boolean isParentServer() {
+		return isParentServer;
+	}
+
+	public void setIsParentServer(boolean isParentServer) {
+		this.isParentServer = isParentServer;
 	}
 }

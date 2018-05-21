@@ -50,13 +50,13 @@ public class Control extends Thread {
 
 	public Control() {
 		// initialize the connections/announcement info/lock item array
-		connections = new ArrayList<Connection>();
+		connections 	= new ArrayList<Connection>();
 		announcementInfo = new ArrayList<JSONObject>();
-		lockItemArray = new ArrayList<LockItem>();
-		userManager = new UserManager();
-		parser = new JSONParser(); // add by yicongLI 19-04-18 initialise parser and remote connection
-		gsonBuilder = new GsonBuilder();
-		uniqueID = Settings.nextSecret();
+		lockItemArray 	= new ArrayList<LockItem>();
+		userManager 	= new UserManager();
+		parser 			= new JSONParser(); // add by yicongLI 19-04-18 initialise parser and remote connection
+		gsonBuilder 	= new GsonBuilder();
+		uniqueID 		= Settings.nextSecret();
 		// start a listener
 		try {
 			listener = new Listener();
@@ -76,6 +76,7 @@ public class Control extends Thread {
 				Connection newCon = outgoingConnection(
 						new Socket(Settings.getRemoteHostname(), Settings.getRemotePort()));
 				newCon.setIsServer(true);
+				newCon.setIsParentServer(true);
 				// add by yicongLI 19-04-18
 				// send authentication to the parent server
 				authenticateRequest(newCon);
@@ -109,6 +110,8 @@ public class Control extends Thread {
 	private synchronized void userInfoReply(Connection outCon) {
 		JSONObject msgObj = new JSONObject();
 		msgObj.put("command", "USERINFOREPLY");
+		msgObj.put("parenthostname", Settings.getRemoteHostname());
+		msgObj.put("parentport", Settings.getRemotePort());
 		msgObj.put("userinfo", FileOperator.allUserInfo().toJSONString());
 		
 		Gson logoutUser = gsonBuilder.create();
@@ -601,6 +604,9 @@ public class Control extends Thread {
 		ArrayList<LogoutUserInfo> arrayList = gson.fromJson(jsonString, type);
 		userManager.setLogoutUserInfos(arrayList);
 		
+		Settings.setParentHostNameOfRemote((String) msgObj.get("parenthostname"));
+		Settings.setParentPortOfRemote((String) msgObj.get("parentport"));
+		
 		return false;
 	}
 
@@ -737,6 +743,11 @@ public class Control extends Thread {
 		if (!term) {
 			connections.remove(con);
 			con.closeCon();
+			
+			if (con.isParentServer()) {
+				// TODO: reconnect to parent server
+				//initiateConnection();
+			}
 		}
 	}
 

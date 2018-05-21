@@ -15,9 +15,6 @@
 	- Create a function to do: 
 		+ Clients are evently distributed over the servers
 	- If server crashes:
-		+ Reconnect the clients to other servers
-		+ Evenly distributed the clients
-	- If client crashes: 
 		+ Evenly distributed the clients
 
 3. Report:
