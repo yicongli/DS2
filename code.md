@@ -21,5 +21,10 @@
 
 3. Report:
 	- Eventual Consistency
+    - "If some figures span two columns then put them at the top of bottom of the page, spanning two columns."
+   
+
+4. Aaron said there is no new client in the Asg2, this means, when a server crashed without any notification or the connection between server and client interruptes, client won't be redirect to the other servers and just lost the connection.
+    - "If you think some goals can't be reached then document that in your report."
 		
 	

@@ -627,7 +627,8 @@ public class Control extends Thread {
 			JSONObject msgObjFinal = new JSONObject();
 			msgObjFinal.put("command", "ACTIVITY_BROADCAST");
 			msgObjFinal.put("activity", activity_message);
-			msgObjFinal.put("timestamp", new Date().toString());
+			long timeInterval = new Date().getTime();
+			msgObjFinal.put("timestamp", new Long(timeInterval));
 
 			broadcastMessage(con, msgObjFinal.toJSONString(), false);
 			

@@ -1,0 +1,36 @@
+I just had a question regarding the part about 
+
+guarantees that an activity message sent by a client reaches all clients that are connected to the network at the time that the message was sent
+How strong a guarantee are you actually looking for? There are a few distinct scenarios I can see :
+
+
+(a) Client guarantee 1 : maybe servers also communicate information about unique clients connected at any time, and messages sent have to be guaranteed to be delivered to all clients globally known to be connected at that point. Eg, if clients get disconnected between a message being sent and the message reaching them, that message should be kept in network storage till the client reconnects and it is delivered
+
+(b) Client guarantee 2 : like first scenario, except there is no global guarantee, each server is only responsible for delivering to clients connected at the time the server receives the broadcast. Eg, if a client disconnects after the server receives the broadcast and before the message is delivered, the server must keep the message till it reconnects
+
+(c) Best effort : ignore the above and behave more or less like project 1 - just propagate activity broadcasts, and if clients or servers disconnect or do not acknowledge, hold messages in a buffer and retry at intervals.
+
+The major issues with (a) and (b) are :
+
+without modifications to the clients, there is actually no reliable way of re-identifying specific clients which disconnect and later come back (there is no client_id, and the client’s port will change with every reconnection)
+clients cannot acknowledge messages without modifications
+we could conceivably identify clients by username, but multiple clients can already be logged in under the same username, and this doesn’t help with anonymous clients
+In light of that, (c) possibly looks like the only feasible interpretation. Actually, the long and short of it is, do you want delivery guarantees only in the case of temporary network partitions, or also covering cases where servers crash and the permanently partitioned servers and clients?
+
+Other questions :
+
+As mentioned during lecture, assuming sequential processing of messages from each connection, there should be inherent ordering of broadcasts from clients, and there’s nothing I’d need to change from Project 1?
+Is there any way to distinguish a crash from a broken network connection? The issue is that here if it is a crash, presumably a child server would want to reconnect to some other server. If it’s a broken network connection, the assumption is that it will eventually be fixed and we will just wait. However, if all we see in both cases is a closed connection, what do we do? 
+In the case of temporary network partitions, how should registration proceed? Do we wait for connectivity to be restored, or should the “main” partition (containing the root server in the tree) continue to process registrations?
+
+
+Overall Rating:
+I'm looking for as strong a guarantee that you can provide given the constraints that you can't modify the client.
+
+Other questions:
+
+1. You can't change the client from project 1.
+
+2. That is a fundamental problem in distributed systems. See how you can solve this.
+
+3. This is a hard part. Can you eventually arrive at a consistency while providing high availability? You may have to sacrifice some availability if you cannot eventually arrive at consistency.
