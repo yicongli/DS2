@@ -12,23 +12,23 @@ public class UserManager {
 		setLoginUserInfos(new ArrayList<LoginUserInfo>());
 	}
 	
-	public ArrayList<LoginUserInfo> getLoginUserInfos() {
+	public synchronized ArrayList<LoginUserInfo> getLoginUserInfos() {
 		return loginUserInfos;
 	}
 
-	public void setLoginUserInfos(ArrayList<LoginUserInfo> loginUserInfos) {
+	public synchronized void setLoginUserInfos(ArrayList<LoginUserInfo> loginUserInfos) {
 		this.loginUserInfos = loginUserInfos;
 	}
 
-	public ArrayList<LogoutUserInfo> getLogoutUserInfos() {
+	public synchronized ArrayList<LogoutUserInfo> getLogoutUserInfos() {
 		return logoutUserInfos;
 	}
 
-	public void setLogoutUserInfos(ArrayList<LogoutUserInfo> logoutUserInfos) {
+	public synchronized void setLogoutUserInfos(ArrayList<LogoutUserInfo> logoutUserInfos) {
 		this.logoutUserInfos = logoutUserInfos;
 	}
 	
-	public void saveLogoutTime(LoginUserInfo userInfo) {
+	public synchronized void saveLogoutTime(LoginUserInfo userInfo) {
 		String ip = Settings.socketAddress(userInfo.getConnection().getSocket());
 		logoutUserInfos.add(new LogoutUserInfo(userInfo.getUsername(), userInfo.getSecret(), ip));
 	}
@@ -40,7 +40,7 @@ public class UserManager {
 	/*
 	 * add by yicongLI check if can operate authentication
 	 * */
-	public int shouldAuthenticateUser (String username, String secret, Connection con) {
+	public synchronized int shouldAuthenticateUser (String username, String secret, Connection con) {
 		int latestIndex = -1;
 		for (LoginUserInfo userInfo : getLoginUserInfos()) {
 			if (userInfo.getUsername().equals(username) 
