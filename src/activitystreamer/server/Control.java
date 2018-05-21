@@ -1,5 +1,7 @@
 package activitystreamer.server;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.net.Socket;
@@ -8,6 +10,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+
+import javax.swing.Timer;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -27,15 +31,17 @@ public class Control extends Thread {
 	private static Listener listener;
 	// add by yicongLI 19-04-18 the parser to parse the Json data
 	public static JSONParser parser; 
-	
 	 // add by yicongLI 20-04-18 the announcement Info from the other server
 	private static ArrayList<JSONObject> announcementInfo;
 	// add by yicongLI 23-04-18 the Identification of current server
 	private static String uniqueID; 
 	// add by yicongLI 23-04-18 the items handling the lock request
 	private static ArrayList<LockItem> lockItemArray; 
-	
-	public static UserManager userManager = null; // UserInfo manager
+	// UserInfo manager
+	public static UserManager userManager = null; 
+	// Reconnect time
+	public static int reconnectTime = 0;
+	public static Timer reconnectTimer = null;
 
 	protected static Control control = null;
 
@@ -72,15 +78,17 @@ public class Control extends Thread {
 			try {
 				Connection newCon = outgoingConnection(
 						new Socket(Settings.getRemoteHostname(), Settings.getRemotePort()));
+				
 				newCon.setIsServer(true);
 				newCon.setIsParentServer(true);
 				// add by yicongLI 19-04-18
 				// send authentication to the parent server
 				authenticateRequest(newCon);
+				// if reconnect success, then reset the reconnect time
+				reconnectTime = 0;
 			} catch (IOException e) {
 				log.error("failed to make connection to " + Settings.getRemoteHostname() + ":"
 						+ Settings.getRemotePort() + " :" + e);
-				System.exit(-1);
 			}
 		}
 	}
@@ -769,11 +777,62 @@ public class Control extends Thread {
 			connections.remove(con);
 			con.closeCon();
 			
+			// if lost connection with parent server, then reconnect server
 			if (con.isParentServer()) {
-				// TODO: reconnect to parent server
-				//initiateConnection();
+				reconnectServer();
 			}
 		}
+	}
+	
+	/*
+	 * reconnect operation function
+	 */
+	public void reconnectServer () {
+		resetReconnectOperation();
+
+		int delay = 6000; // Milliseconds
+        ActionListener taskTimer = new ActionListener() {
+        	// updating method
+            public void actionPerformed(ActionEvent evt) {
+                if (changeReconnectStatus()) {
+					initiateConnection();
+				}
+            }
+        };
+
+        // set timer for updating graphs
+        reconnectTimer = new Timer(delay,taskTimer);
+        reconnectTimer.start();
+	}
+	
+	/*
+	 * reset reconnect timer and time record
+	 */
+	public synchronized void resetReconnectOperation () {
+		reconnectTime = 0;
+		reconnectTimer.stop();
+		reconnectTimer = null;
+	}
+	
+	/*
+	 * change reconnection status
+	 * if return true, then stop reconnection
+	 */
+	public synchronized boolean changeReconnectStatus () {
+		// if tick reach the end of whole simulate process
+        reconnectTime ++;
+        // if reconnect time larger than 3, then reconnect to parent server of remote host
+        if (reconnectTime == 3) {
+			Settings.setRemoteHostname(Settings.getParentHostNameOfRemote());
+			Settings.setRemotePort(Settings.getParentPortOfRemote());
+        }
+        // if reconnect more than 4 times, then exit program directly
+        else if (reconnectTime == 5) {
+			resetReconnectOperation();
+			System.exit(-1);
+		}
+        
+        return false;
 	}
 
 	/*
