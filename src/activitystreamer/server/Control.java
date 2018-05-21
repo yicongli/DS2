@@ -1,6 +1,7 @@
 package activitystreamer.server;
 
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Date;
@@ -14,6 +15,10 @@ import org.apache.logging.log4j.Logger;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+
 import activitystreamer.util.Settings;
 
 public class Control extends Thread {
@@ -23,6 +28,8 @@ public class Control extends Thread {
 	private static Listener listener;
 	// add by yicongLI 19-04-18 the parser to parse the Json data
 	public static JSONParser parser; 
+	public static GsonBuilder gsonBuilder;
+	
 	 // add by yicongLI 20-04-18 the announcement Info from the other server
 	private static ArrayList<JSONObject> announcementInfo;
 	// add by yicongLI 23-04-18 the Identification of current server
@@ -48,6 +55,7 @@ public class Control extends Thread {
 		lockItemArray = new ArrayList<LockItem>();
 		userManager = new UserManager();
 		parser = new JSONParser(); // add by yicongLI 19-04-18 initialise parser and remote connection
+		gsonBuilder = new GsonBuilder();
 		uniqueID = Settings.nextSecret();
 		// start a listener
 		try {
@@ -102,6 +110,11 @@ public class Control extends Thread {
 		JSONObject msgObj = new JSONObject();
 		msgObj.put("command", "USERINFOREPLY");
 		msgObj.put("userinfo", FileOperator.allUserInfo().toJSONString());
+		
+		Gson logoutUser = gsonBuilder.create();
+		logoutUser.toJson(userManager.getLogoutUserInfos());
+		msgObj.put("logoutUserInfos", logoutUser.toString());
+		
 		outCon.writeMsg(msgObj.toJSONString());
 	}
 	
@@ -119,7 +132,7 @@ public class Control extends Thread {
 		msgObj.put("load", loadNum());
 		msgObj.put("hostname", hostname);
 		msgObj.put("port", Settings.getLocalPort());
-
+		
 		broadcastMessage(null, msgObj.toJSONString(), true);
 	}
 	
@@ -581,6 +594,12 @@ public class Control extends Thread {
 	private synchronized boolean saveUserInfo(JSONObject msgObj) {
 		String jsonString = (String) msgObj.get("userinfo");
 		FileOperator.saveUserInfoToLocal(jsonString);
+		
+		jsonString = (String) msgObj.get("logoutUserInfos");
+		Gson gson = new Gson();
+		Type type = new TypeToken<ArrayList<LogoutUserInfo>>(){}.getType();
+		ArrayList<LogoutUserInfo> arrayList = gson.fromJson(jsonString, type);
+		userManager.setLogoutUserInfos(arrayList);
 		
 		return false;
 	}
