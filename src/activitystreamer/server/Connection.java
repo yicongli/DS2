@@ -27,8 +27,6 @@ public class Connection extends Thread {
 	// add by yicongLI 20-04-18 
 	// the flag to indicate if the connection is client, default is not sever
 	private boolean isServer = false; 
-	// store the username for logged in client
-	private String username = ""; 
 	// store the secrete for Server and client
 	private String secrete  = ""; 
 	
@@ -77,6 +75,12 @@ public class Connection extends Thread {
 			while(!term && (data = inreader.readLine())!=null){
 				term=Control.getInstance().process(this,data);
 			}
+			
+			// remove login user info when log out
+			if (!isServer) {
+				Control.userManager.removeLoginUserInfo(this); 
+			}
+			
 			log.debug("connection closed to "+Settings.socketAddress(socket));
 			Control.getInstance().connectionClosed(this);
 			in.close();
@@ -101,14 +105,6 @@ public class Connection extends Thread {
 	
 	public boolean isOpen() {
 		return open;
-	}
-	
-	public String username () {
-		return username;
-	}
-	
-	public void setUsername (String un) {
-		username = un;
 	}
 	
 	public String secrete () {

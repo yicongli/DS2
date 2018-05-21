@@ -29,6 +29,8 @@ public class Control extends Thread {
 	private static String uniqueID; 
 	// add by yicongLI 23-04-18 the items handling the lock request
 	private static ArrayList<LockItem> lockItemArray; 
+	
+	public static UserManager userManager = null; // UserInfo manager
 
 	protected static Control control = null;
 
@@ -44,6 +46,7 @@ public class Control extends Thread {
 		connections = new ArrayList<Connection>();
 		announcementInfo = new ArrayList<JSONObject>();
 		lockItemArray = new ArrayList<LockItem>();
+		userManager = new UserManager();
 		parser = new JSONParser(); // add by yicongLI 19-04-18 initialise parser and remote connection
 		uniqueID = Settings.nextSecret();
 		// start a listener
@@ -304,9 +307,8 @@ public class Control extends Thread {
 		String localsecret = FileOperator.checkLocalStorage(username);
 		if (localsecret != null && localsecret.equals(secret)) {
 			cmd = "LOGIN_SUCCESS";
-			info = "logged in as user " + username;
-			con.setUsername(username);
-			con.setSecret(secret);
+			info = "logged in as user " + username;;
+			userManager.addNewLoginUserInfo(username, secret, con);
 			responseMsg(cmd, info, con);
 
 			return redirectionLogin(con);
@@ -621,14 +623,17 @@ public class Control extends Thread {
 		String userName = (String) msgObject.get("username");
 		String secret = (String) msgObject.get("secret");
 		
-		if (shoudAuthenticateUser(userName, secret, con))  {
+		int latestIndex = userManager.shoudAuthenticateUser(userName, secret, con);
+		if (latestIndex != -1)  {
 			activity_message.put("authenticated_user", userName);
 			
 			JSONObject msgObjFinal = new JSONObject();
 			msgObjFinal.put("command", "ACTIVITY_BROADCAST");
 			msgObjFinal.put("activity", activity_message);
+			// add time stamp and index
 			long timeInterval = new Date().getTime();
 			msgObjFinal.put("timestamp", new Long(timeInterval));
+			msgObjFinal.put("index", new Integer(latestIndex));
 
 			broadcastMessage(con, msgObjFinal.toJSONString(), false);
 			
@@ -637,22 +642,6 @@ public class Control extends Thread {
 			responseInvalidMsg("User not authenticated.", con);
 			return true;
 		}
-	}
-	
-	/*
-	 * add by yicongLI check if can operate authentication
-	 * */
-	private boolean shoudAuthenticateUser (String username, String secret, Connection con) {
-		Boolean shouldAuthenticate = false;
-		for (Connection connection : connections) {
-			if (connection.username().equals(username) 
-					&& connection.secrete().equals(secret)
-						&& connection.equals(con)) {
-				shouldAuthenticate = true;
-			}
-		}
-		
-		return shouldAuthenticate;
 	}
 
 	// added, modified and finished -- pateli
