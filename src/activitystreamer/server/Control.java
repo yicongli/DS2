@@ -112,8 +112,11 @@ public class Control extends Thread {
 		msgObj.put("userinfo", FileOperator.allUserInfo().toJSONString());
 		
 		Gson logoutUser = new Gson();
-		logoutUser.toJson(userManager.getLogoutUserInfos());
-		msgObj.put("logoutUserInfos", logoutUser.toString());
+		String logoutInfo = logoutUser.toJson(userManager.getLogoutUserInfos());
+		//Type type = new TypeToken<ArrayList<LogoutUserInfo>>(){}.getType();
+		//ArrayList<LogoutUserInfo> arrayList = logoutUser.fromJson(se, type);
+		
+		msgObj.put("logoutUserInfos", logoutInfo);
 		
 		outCon.writeMsg(msgObj.toJSONString());
 	}
@@ -134,8 +137,8 @@ public class Control extends Thread {
 		
 		// put children server address info into announcement
 		Gson childrenServerInfo = new Gson();
-		childrenServerInfo.toJson(childrenServerInfo());
-		msgObj.put("children", childrenServerInfo.toString());
+		String childrenInfo = childrenServerInfo.toJson(childrenServerInfo());
+		msgObj.put("children", childrenInfo);
 		
 		broadcastMessage(null, msgObj.toJSONString(), true);
 	}
