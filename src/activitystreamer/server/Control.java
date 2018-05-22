@@ -898,15 +898,17 @@ public class Control extends Thread {
 			// filter con of children server
 			if (con.getIsServer() && !con.getIsRemoteServer()) {
 				String IP = con.getSocket().getInetAddress().toString();
+				// if the server is in same IP address with current server, then get the current external IP
+				String compareIP = IP.equals("/127.0.0.1") ? Settings.getIp() : IP.substring(1, IP.length()-1);
 				
 				// get listen port number from announcement information
-				Predicate<? super JSONObject> filter = s -> IP.equals((String)s.get("hostname"));
+				Predicate<? super JSONObject> filter = s -> ((String)s.get("hostname")).equals(compareIP);
 				List<JSONObject> curItem = announcementInfo.stream().filter(filter).collect(Collectors.toList());
 				
 				if (curItem.size() > 0) {
 					JSONObject item = (JSONObject) curItem.get(0);
 					JSONObject info = new JSONObject();
-					info.put("hostname", IP);
+					info.put("hostname", compareIP);
 					info.put("port", (Long)item.get("port"));
 					
 					childrenInfo.add(info);

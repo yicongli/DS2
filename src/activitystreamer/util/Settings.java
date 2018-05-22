@@ -160,7 +160,8 @@ public class Settings {
             }  
         } catch (SocketException e) {  
             e.printStackTrace();  
-        }  
+        } 
+        
         if (netip != null && !"".equals(netip)) {  
             return netip;  
         } else {  
