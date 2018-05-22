@@ -816,25 +816,76 @@ public class Control extends Thread {
 	
 	/*
 	 * change reconnection status
-	 * if return true, then stop reconnection
+	 * if return false, then stop reconnection
 	 */
 	public synchronized boolean changeReconnectStatus () {
 		// if tick reach the end of whole simulate process
         reconnectTime ++;
         // if reconnect time larger than 3, then reconnect to parent server of remote host
         if (reconnectTime == 3) {
-			Settings.setRemoteHostname(Settings.getParentHostNameOfRemote());
-			Settings.setRemotePort(Settings.getParentPortOfRemote());
+        	// if remote server has parent server, then connect to this parent server
+        	if (Settings.getParentHostNameOfRemote() != null) {
+        		Settings.setRemoteHostname(Settings.getParentHostNameOfRemote());
+    			Settings.setRemotePort(Settings.getParentPortOfRemote());
+			}
+        	else {
+        		// if remote server doesn't have parent server(it is root server), then connect to first sibling
+        		JSONObject serverInfo = findSiblingServer();
+        		if (serverInfo != null) {
+        			Settings.setRemoteHostname((String)serverInfo.get("hostname"));
+        			Settings.setRemotePort(((Long)serverInfo.get("port")).intValue());
+				}
+        		else {
+        			// if this server is the first sibling, then treat itself as the new root server
+					resetReconnectOperation();
+					return false;
+				}
+        	}
         }
         // if reconnect more than 4 times, then exit program directly
         else if (reconnectTime == 5) {
-			resetReconnectOperation();
 			System.exit(-1);
 		}
         
-        return false;
+        return true;
 	}
 
+	/*
+	 * find the first available sibling server
+	 */
+	private JSONObject findSiblingServer () {
+		for (JSONObject jsonObject : announcementInfo) {
+			String jsonString = (String)jsonObject.get("children");
+			String hostname = (String)jsonObject.get("hostname");
+			Long port = (Long)jsonObject.get("port");
+			
+			// find the remote server from server announcements
+			if (hostname.equals(Settings.getRemoteHostname()) && port == Settings.getRemotePort()) {
+				Gson childrenServerInfo = new Gson();
+				Type type = new TypeToken<ArrayList<JSONObject>>(){}.getType();
+				// get all children server of the remote server
+				ArrayList<JSONObject> arrayList = childrenServerInfo.fromJson(jsonString, type);
+				
+				// all the server connect to the first sibling, the first one become the root server
+				// if remote server only have one child server, then this server is the new root server
+				if (arrayList.size() > 1) {
+					// get first sibling server
+					JSONObject serverInfo = arrayList.get(0);
+					String childHostname = (String)serverInfo.get("hostname");
+					int childport = ((Long)serverInfo.get("port")).intValue();
+					
+					// if current server is not the first server, then connect to this server
+					// otherwise treat current server as root server
+					if (!(childHostname.equals(Settings.getIp()) && childport == Settings.getLocalPort())) {
+						return serverInfo;
+					}
+				}
+			}
+		}
+		
+		return null;
+	}
+	
 	/*
 	 * A new incoming connection has been established, and a reference is returned to it
 	 */
