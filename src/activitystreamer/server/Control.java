@@ -29,19 +29,13 @@ public class Control extends Thread {
 	private static ArrayList<Connection> connections;
 	private static boolean term = false;
 	private static Listener listener;
-	// add by yicongLI 19-04-18 the parser to parse the Json data
-	public static JSONParser parser; 
-	 // add by yicongLI 20-04-18 the announcement Info from the other server
-	private static ArrayList<JSONObject> announcementInfo;
-	// add by yicongLI 23-04-18 the Identification of current server
-	private static String uniqueID; 
-	// add by yicongLI 23-04-18 the items handling the lock request
-	private static ArrayList<LockItem> lockItemArray; 
-	// UserInfo manager
-	public static UserManager userManager = null; 
-	// Reconnect time
-	public static int reconnectTime = 0;
-	public static Timer reconnectTimer = null;
+	private static ArrayList<JSONObject> announcementInfo; 	// the announcement Info from the other server
+	private static String uniqueID; 						// the Identification of current server
+	private static ArrayList<LockItem> lockItemArray;  		// the items handling the lock request
+	public static JSONParser parser; 						// the parser to parse the JSON data
+	public static UserManager userManager = null; 			// UserInfo manager
+	private static int reconnectTime = 0;					// Reconnect time
+	private static Timer reconnectTimer = null;				// Reconnect timer
 
 	protected static Control control = null;
 
@@ -53,19 +47,18 @@ public class Control extends Thread {
 	}
 
 	public Control() {
-		// initialize the connections/announcement info/lock item array
-		connections 	= new ArrayList<Connection>();
-		announcementInfo = new ArrayList<JSONObject>();
-		lockItemArray 	= new ArrayList<LockItem>();
-		userManager 	= new UserManager();
-		parser 			= new JSONParser(); // add by yicongLI 19-04-18 initialise parser and remote connection
-		uniqueID 		= Settings.nextSecret();
-		// start a listener
+		
+		connections 	  = new ArrayList<Connection>();	// initialize the connections item array
+		announcementInfo  = new ArrayList<JSONObject>(); 	// initialize the announcement item array
+		lockItemArray 	  = new ArrayList<LockItem>();		// initialize the lock item array
+		userManager 	  = new UserManager();				// manage login/logout user info
+		parser 			  = new JSONParser(); 				// initialize parser and remote connection
+		uniqueID 		  = Settings.nextSecret();
+		
 		try {
-			listener = new Listener();
-			initiateConnection();
-
-			start(); // start regular operation
+			listener = new Listener(); 	// start a listener
+			initiateConnection();		// initiate connection with remote server
+			start(); 					// start regular operation
 		} catch (IOException e1) {
 			log.fatal("failed to startup a listening thread: " + e1);
 			System.exit(-1);
@@ -79,111 +72,30 @@ public class Control extends Thread {
 				Connection newCon = outgoingConnection(
 						new Socket(Settings.getRemoteHostname(), Settings.getRemotePort()));
 				
-				newCon.setIsServer(true);
-				newCon.setIsParentServer(true);
-				// add by yicongLI 19-04-18
-				// send authentication to the parent server
-				authenticateRequest(newCon);
-				// if reconnect success, then reset the reconnect time
-				reconnectTime = 0;
+				newCon.setIsServer(true);		// set flag of server
+				newCon.setIsRemoteServer(true); // set if this server is the remote server
+				authenticateRequest(newCon);	// send authentication to the parent server
+				reconnectTime = 0;				// if reconnect success, then reset the reconnect time
 			} catch (IOException e) {
-				log.error("failed to make connection to " + Settings.getRemoteHostname() + ":"
-						+ Settings.getRemotePort() + " :" + e);
+				log.error("failed to make connection to " 
+							+ Settings.getRemoteHostname() + ":"
+							+ Settings.getRemotePort() + " :" + e);
 			}
 		}
 	}
 
 	/*
-	 * sending message functions
-	 */
-
-	/*
-	 * add by yicongLI 19-04-18 send authenticate: S-S 
+	 * send authenticate include: S-S 
+	 * @secret: the secret of server system
+	 * @port: the listening port of current server
 	 */
 	@SuppressWarnings("unchecked")
 	private synchronized void authenticateRequest(Connection outCon) {
 		JSONObject msgObj = new JSONObject();
 		msgObj.put("command", "AUTHENTICATE");
 		msgObj.put("secret", Settings.getServerSecret());
-		outCon.writeMsg(msgObj.toJSONString());
-	}
-	
-	/*
-	 * send userInfo back to the server which request authentication: S-S 
-	 */
-	@SuppressWarnings("unchecked")
-	private synchronized void userInfoReply(Connection outCon) {
-		JSONObject msgObj = new JSONObject();
-		msgObj.put("command", "USERINFOREPLY");
-		msgObj.put("parenthostname", Settings.getRemoteHostname());
-		msgObj.put("parentport", Settings.getRemotePort());
-		msgObj.put("userinfo", FileOperator.allUserInfo().toJSONString());
-		
-		Gson logoutUser = new Gson();
-		String logoutInfo = logoutUser.toJson(userManager.getLogoutUserInfos());
-		//Type type = new TypeToken<ArrayList<LogoutUserInfo>>(){}.getType();
-		//ArrayList<LogoutUserInfo> arrayList = logoutUser.fromJson(se, type);
-		
-		msgObj.put("logoutUserInfos", logoutInfo);
-		
-		outCon.writeMsg(msgObj.toJSONString());
-	}
-	
-	/*
-	 * add by yicongLI 23-04-18 broadcast server load state to the other servers
-	 */
-	@SuppressWarnings("unchecked")
-	private synchronized void regularAnnouncement() {
-		String hostname = Settings.getIp();
-		
-		JSONObject msgObj = new JSONObject();
-		msgObj.put("command", "SERVER_ANNOUNCE");
-		msgObj.put("id", uniqueID);
-		msgObj.put("load", loadNum());
-		msgObj.put("hostname", hostname);
 		msgObj.put("port", Settings.getLocalPort());
-		
-		// put children server address info into announcement
-		Gson childrenServerInfo = new Gson();
-		String childrenInfo = childrenServerInfo.toJson(childrenServerInfo());
-		msgObj.put("children", childrenInfo);
-		
-		broadcastMessage(null, msgObj.toJSONString(), true);
-	}
-	
-	/*
-	 * get all children server IP address info
-	 */
-	@SuppressWarnings("unchecked")
-	private synchronized ArrayList<JSONObject> childrenServerInfo () {
-		ArrayList<JSONObject> childrenInfo = new ArrayList<JSONObject>();
-		for (Connection con : connections) {
-			if (con.getIsServer() && !con.isParentServer()) {
-				JSONObject info = new JSONObject();
-				info.put("hostname", con.getSocket().getInetAddress());
-				info.put("port", con.getSocket().getPort());
-				
-				childrenInfo.add(info);
-			}
-		}
-		
-		return childrenInfo;
-	}
-	
-	
-	/*
-	 * return current load count 
-	 */
-	private synchronized Integer loadNum () {
-		Integer load = 0;
-
-		for (Connection con : connections) {
-			if (!con.getIsServer()) {
-				load++;
-			}
-		}
-		
-		return load;
+		outCon.writeMsg(msgObj.toJSONString());
 	}
 
 	/*
@@ -358,7 +270,8 @@ public class Control extends Thread {
 			info = "logged in as user " + username;;
 			userManager.addNewLoginUserInfo(username, secret, con);
 			responseMsg(cmd, info, con);
-
+			
+			// check if need to redirect login, if need, then close current server
 			return redirectionLogin(con);
 		} else {
 			return loginFailed("User"+username+" not found or secret: "+secret+" not right", con);
@@ -372,24 +285,6 @@ public class Control extends Thread {
 		responseMsg("LOGIN_FAILED", info, con);
 		connectionClosed(con);
 		return true;
-	}
-	
-    /*
-     * check redirect once 5 seconds, redirect one client a time
-     */
-	private void checkRedirection () {
-		Connection redirectCon = null;
-		for (Connection curCon : connections) {
-			if (!curCon.getIsServer()) {
-				if (redirectionLogin(curCon)) {
-					redirectCon = curCon;
-				}
-			}
-		}
-		
-		if (redirectCon != null) {
-			connectionClosed(redirectCon);
-		}
 	}
     
 	/*
@@ -419,7 +314,7 @@ public class Control extends Thread {
 	 *  get server info with lowest load
 	 */
 	private JSONObject getRedirectionInfo() {
-		int currentLoad = loadNum();
+		int currentLoad = clientLoadNum();
 		JSONObject target = null;
 		
 		for (JSONObject jsonAvailabilityObj : announcementInfo) {
@@ -458,9 +353,30 @@ public class Control extends Thread {
 		userInfoReply(con);
 		return false;
 	}
+	
+	/*
+	 * send info back to the server which request authentication include : S-S 
+	 */
+	@SuppressWarnings("unchecked")
+	private synchronized void userInfoReply(Connection outCon) {
+		JSONObject msgObj = new JSONObject();
+		msgObj.put("command", "USERINFOREPLY");
+		msgObj.put("remotehostname", Settings.getRemoteHostname());
+		msgObj.put("remoteport", Settings.getRemotePort());
+		msgObj.put("userinfo", FileOperator.allUserInfo().toJSONString());
+		
+		// synchronize logout user info 
+		Gson logoutUser = new Gson();
+		String logoutInfo = logoutUser.toJson(userManager.getLogoutUserInfos());
+		msgObj.put("logoutUserInfos", logoutInfo);
+		
+		outCon.writeMsg(msgObj.toJSONString());
+	}
 
-	// Added by thaol4
-	// register fail, server replies, close connection
+	/*
+	 * Added by thaol4
+	 * register fail, server replies, close connection
+	 */
 	private void registerFail(String username, Connection con) {
 		String cmd = "REGISTER_FAILED";
 		String info = username + " is already registered with the system";
@@ -468,8 +384,10 @@ public class Control extends Thread {
 		connectionClosed(con);
 	}
 
-	// Added by thaol4
-	// register success, append new username and secret pair to file, server replies
+	/*
+	 * Added by thaol4
+	 * register success, append new username and secret pair to file, server replies
+	 */
 	private void registerSuccess(String username, String secret, Connection con) {
 		String cmd = "REGISTER_SUCCESS";
 		String info = "register success for " + username;
@@ -630,14 +548,16 @@ public class Control extends Thread {
 		String jsonString = (String) msgObj.get("userinfo");
 		FileOperator.saveUserInfoToLocal(jsonString);
 		
+		// store logout user info into userManager
 		jsonString = (String) msgObj.get("logoutUserInfos");
 		Gson gson = new Gson();
 		Type type = new TypeToken<ArrayList<LogoutUserInfo>>(){}.getType();
 		ArrayList<LogoutUserInfo> arrayList = gson.fromJson(jsonString, type);
 		userManager.setLogoutUserInfos(arrayList);
 		
-		Settings.setParentHostNameOfRemote((String) msgObj.get("parenthostname"));
-		Long portNum = (Long)msgObj.get("parentport");
+		// save ParentHostName remote hostname/port
+		Settings.setParentHostNameOfRemote((String) msgObj.get("remotehostname"));
+		Long portNum = (Long)msgObj.get("remoteport");
 		Settings.setParentPortOfRemote(portNum.intValue());
 		
 		return false;
@@ -778,7 +698,7 @@ public class Control extends Thread {
 			con.closeCon();
 			
 			// if lost connection with parent server, then reconnect server
-			if (con.isParentServer()) {
+			if (con.getIsRemoteServer()) {
 				reconnectServer();
 			}
 		}
@@ -794,6 +714,7 @@ public class Control extends Thread {
         ActionListener taskTimer = new ActionListener() {
         	// updating method
             public void actionPerformed(ActionEvent evt) {
+            	// if fail to change status, then don't reconnect the server
                 if (changeReconnectStatus()) {
 					initiateConnection();
 				}
@@ -801,7 +722,7 @@ public class Control extends Thread {
         };
 
         // set timer for updating graphs
-        reconnectTimer = new Timer(delay,taskTimer);
+        reconnectTimer = new Timer(delay, taskTimer);
         reconnectTimer.start();
 	}
 	
@@ -855,9 +776,9 @@ public class Control extends Thread {
 	 */
 	private JSONObject findSiblingServer () {
 		for (JSONObject jsonObject : announcementInfo) {
-			String jsonString = (String)jsonObject.get("children");
-			String hostname = (String)jsonObject.get("hostname");
-			Long port = (Long)jsonObject.get("port");
+			String jsonString 	= (String)jsonObject.get("children");
+			String hostname 	= (String)jsonObject.get("hostname");
+			Long port 			= (Long)  jsonObject.get("port");
 			
 			// find the remote server from server announcements
 			if (hostname.equals(Settings.getRemoteHostname()) && port == Settings.getRemotePort()) {
@@ -930,6 +851,89 @@ public class Control extends Thread {
 		}
 		
 		listener.setTerm(true);
+	}
+	
+	/*
+	 * add by yicongLI 23-04-18 broadcast server load state to the other servers
+	 */
+	@SuppressWarnings("unchecked")
+	private synchronized void regularAnnouncement() {
+		JSONObject msgObj = new JSONObject();
+		msgObj.put("command", "SERVER_ANNOUNCE");
+		msgObj.put("id", uniqueID);
+		msgObj.put("load", clientLoadNum());
+		msgObj.put("hostname", Settings.getIp());
+		msgObj.put("port", Settings.getLocalPort());
+		
+		// put children server address info into announcement
+		Gson childrenServerInfo = new Gson();
+		String childrenInfo = childrenServerInfo.toJson(childrenServerInfo());
+		msgObj.put("children", childrenInfo);
+		
+		broadcastMessage(null, msgObj.toJSONString(), true);
+	}
+	
+	/*
+	 * return current client load count 
+	 */
+	private synchronized Integer clientLoadNum () {
+		Integer load = 0;
+
+		for (Connection con : connections) {
+			if (!con.getIsServer()) {
+				load++;
+			}
+		}
+		
+		return load;
+	}
+	
+	/*
+	 * get all children server IP address info
+	 */
+	@SuppressWarnings("unchecked")
+	private synchronized ArrayList<JSONObject> childrenServerInfo () {
+		ArrayList<JSONObject> childrenInfo = new ArrayList<JSONObject>();
+		for (Connection con : connections) {
+			// filter con of children server
+			if (con.getIsServer() && !con.getIsRemoteServer()) {
+				String IP = con.getSocket().getInetAddress().toString();
+				
+				// get listen port number from announcement information
+				Predicate<? super JSONObject> filter = s -> IP.equals((String)s.get("hostname"));
+				List<JSONObject> curItem = announcementInfo.stream().filter(filter).collect(Collectors.toList());
+				
+				if (curItem.size() > 0) {
+					JSONObject item = (JSONObject) curItem.get(0);
+					JSONObject info = new JSONObject();
+					info.put("hostname", IP);
+					info.put("port", (Long)item.get("port"));
+					
+					childrenInfo.add(info);
+				}
+
+			}
+		}
+		
+		return childrenInfo;
+	}
+	
+    /*
+     * check redirect once 5 seconds, redirect one client a time
+     */
+	private void checkRedirection () {
+		Connection redirectCon = null;
+		for (Connection curCon : connections) {
+			if (!curCon.getIsServer()) {
+				if (redirectionLogin(curCon)) {
+					redirectCon = curCon;
+				}
+			}
+		}
+		
+		if (redirectCon != null) {
+			connectionClosed(redirectCon);
+		}
 	}
 
 	public final void setTerm(boolean t) {

@@ -28,3 +28,5 @@
 5. if root server crashed, the rest server should join together and choose one as new root server, choose the one with most load as root server
 		
 6. Activity is not broadcasted to all the servers and hence, all the clients. the broadcast message has been altered by your implementation as displayed on my server. for example, {"1":"1"} is displayed as {"1":"1"}. Moreover, the activity message sent is not shown properly at other client side, for eg. C2 client sends {"f":"F"}, the message is broadcasted as C2:F.
+
+7. Potential extension: maintain a server-tree in each server, when reconnect, search the server in this tree

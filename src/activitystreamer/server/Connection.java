@@ -23,14 +23,10 @@ public class Connection extends Thread {
 	private PrintWriter outwriter;
 	private boolean open = false;
 	private Socket socket;
-	private boolean term=false;
-	// add by yicongLI 20-04-18 
-	// the flag to indicate if the connection is client, default is not sever
-	private boolean isServer = false; 
-	// indicate if the connection is the parent server of current server
-	private boolean isParentServer = false;
-	// store the secrete for Server
-	private String secrete  = ""; 
+	private boolean term = false;
+	private boolean isServer = false; 		// indicate if the connection is client, default is not sever
+	private boolean isRemoteServer = false; // indicate if the connection is the remote server of current server
+	private String secrete  = ""; 			// store the secrete for Server
 	
 	Connection(Socket socket) throws IOException{
 		in = new DataInputStream(socket.getInputStream());
@@ -117,11 +113,11 @@ public class Connection extends Thread {
 		secrete = se;
 	}
 
-	public boolean isParentServer() {
-		return isParentServer;
+	public boolean getIsRemoteServer() {
+		return isRemoteServer;
 	}
 
-	public void setIsParentServer(boolean isParentServer) {
-		this.isParentServer = isParentServer;
+	public void setIsRemoteServer(boolean isRServer) {
+		this.isRemoteServer = isRServer;
 	}
 }
