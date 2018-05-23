@@ -757,7 +757,8 @@ public class Control extends Thread {
         		JSONObject serverInfo = findSiblingServer();
         		if (serverInfo != null) {
         			Settings.setRemoteHostname((String)serverInfo.get("hostname"));
-        			Settings.setRemotePort(((Long)serverInfo.get("port")).intValue());
+        			// the Long value has been convert into Double by Gson
+        			Settings.setRemotePort(((Double)serverInfo.get("port")).intValue());
 				}
         		else {
         			// if this server is the first sibling, then treat itself as the new root server
@@ -779,15 +780,23 @@ public class Control extends Thread {
 	 */
 	private JSONObject findSiblingServer () {
 		for (JSONObject jsonObject : announcementInfo) {
-			String jsonString 	= (String)jsonObject.get("children");
 			String hostname 	= (String)jsonObject.get("hostname");
 			Long port 			= (Long)  jsonObject.get("port");
 			
+			String remoteHostname = Settings.getRemoteHostname();
+			int remotePort = Settings.getRemotePort();
+			
+			if (remoteHostname.equals("localhost") || remoteHostname.equals("127.0.0.1")) {
+				remoteHostname = Settings.getIp();
+			}
+			
 			// find the remote server from server announcements
-			if (hostname.equals(Settings.getRemoteHostname()) && port == Settings.getRemotePort()) {
+			if (hostname.equals(remoteHostname) && port == remotePort) {
+				String jsonString 	= (String)jsonObject.get("children");
 				Gson childrenServerInfo = new Gson();
 				Type type = new TypeToken<ArrayList<JSONObject>>(){}.getType();
 				// get all children server of the remote server
+				// the Long value will be convert into Double
 				ArrayList<JSONObject> arrayList = childrenServerInfo.fromJson(jsonString, type);
 				
 				// all the server connect to the first sibling, the first one become the root server
@@ -796,7 +805,7 @@ public class Control extends Thread {
 					// get first sibling server
 					JSONObject serverInfo = arrayList.get(0);
 					String childHostname = (String)serverInfo.get("hostname");
-					int childport = ((Long)serverInfo.get("port")).intValue();
+					int childport = ((Double)serverInfo.get("port")).intValue();
 					
 					// if current server is not the first server, then connect to this server
 					// otherwise treat current server as root server
