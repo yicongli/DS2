@@ -112,16 +112,20 @@ public class ClientSkeleton extends Thread {
 	@SuppressWarnings("unchecked")
 	public void sendActivityObject(String msg) {
 		String origin = textFrame.getOutputText();
-		textFrame.setOutputText(origin + "self : " + msg + "\n");
-
+		
+		textFrame.setOutputText(origin + "me : " + msg + "\n");
+		
+		
 		JSONObject msgObjFinal = new JSONObject();
 		msgObjFinal.put("command", "ACTIVITY_MESSAGE");
 		msgObjFinal.put("username", Settings.getUsername());
 		msgObjFinal.put("secret", Settings.getUserSecret());
 		JSONObject json = new JSONObject();
-		json.put("note", msg);
-
+		json.put("message", msg);
+		
 		msgObjFinal.put("activity", json);
+		
+		//textFrame.setOutputText(origin + "\n" + msgObjFinal.toJSONString() + "\n");
 		try {
 			writer.write(msgObjFinal.toJSONString() + "\n");
 			writer.flush();
@@ -191,9 +195,9 @@ public class ClientSkeleton extends Thread {
 			return true;
 		case "ACTIVITY_BROADCAST":
 			JSONObject actobj = (JSONObject) reobj.get("activity");
-			String content = null;
-			String userName = null;
-			if (actobj.size() == 2) {
+			String content = actobj.toJSONString();
+			//String userName = null;
+			/*if (actobj.size() == 2) {
 				for (Object key : actobj.keySet()) {
 					String keyvalue = (String) key;
 					if (!keyvalue.equals("authenticated_user")) {
@@ -204,10 +208,12 @@ public class ClientSkeleton extends Thread {
 				}
 			} else {
 				content = actobj.toString();
-			}
-
+			}*/
+			
 			String origin = textFrame.getOutputText();
-			textFrame.setOutputText(origin + userName + " : " + content + "\n");
+			//textFrame.setOutputText(origin + userName + " : " + content + "\n");
+			
+			textFrame.setOutputText(origin + content + "\n");
 			return false;
 		case "REGISTER_SUCCESS":
 			System.out.println("User " + username + " has secret: " + nextSecret);
