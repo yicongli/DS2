@@ -3,8 +3,6 @@ package activitystreamer.server;
 import java.util.ArrayList;
 import java.util.Date;
 
-import activitystreamer.util.Settings;
-
 /*
  * Anonymous identify with ip (username is "") and normal user identify with username 
  */
@@ -84,7 +82,7 @@ class LoginUserInfo extends UserInfo {
 	private int latestIndex = 0;
 	
 	public LoginUserInfo(String name, String sec, Connection con) {
-		super(name, sec, Settings.socketAddress(con.getSocket()));
+		super(name, sec, con.getIPAddressWithPort());
 		connection = con;
 	}
 

@@ -121,10 +121,6 @@ public class Settings {
 		Settings.parentPortOfRemote = parentPort;
 	}
 
-	public static String socketAddress(Socket socket){
-		return socket.getInetAddress()+":"+socket.getPort();
-	}
-
 	public static String nextSecret() {
 	    return new BigInteger(130, random).toString(32);
 	 }

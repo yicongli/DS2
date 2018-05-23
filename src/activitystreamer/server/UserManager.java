@@ -1,6 +1,5 @@
 package activitystreamer.server;
 import java.util.ArrayList;
-import activitystreamer.util.Settings;
 
 public class UserManager {
 	
@@ -29,8 +28,7 @@ public class UserManager {
 	}
 	
 	public synchronized void saveLogoutTime(LoginUserInfo userInfo) {
-		String ip = Settings.socketAddress(userInfo.getConnection().getSocket());
-		logoutUserInfos.add(new LogoutUserInfo(userInfo.getUsername(), userInfo.getSecret(), ip));
+		logoutUserInfos.add(new LogoutUserInfo(userInfo.getUsername(), userInfo.getSecret(), userInfo.getIpAddress()));
 	}
 	
 	public synchronized void addNewLoginUserInfo(String username, String secret, Connection con) {

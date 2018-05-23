@@ -53,14 +53,14 @@ public class Connection extends Thread {
 	
 	public void closeCon(){
 		if(open){
-			log.info("closing connection "+Settings.socketAddress(socket));
+			log.info("closing connection "+getIPAddressWithPort());
 			try {
 				term=true;
 				inreader.close();
 				out.close();
 			} catch (IOException e) {
 				// already closed?
-				log.error("received exception closing the connection "+Settings.socketAddress(socket)+": "+e);
+				log.error("received exception closing the connection "+getIPAddressWithPort()+": "+e);
 			}
 		}
 	}
@@ -80,11 +80,11 @@ public class Connection extends Thread {
 				Control.userManager.removeLoginUserInfo(this); 
 			}
 			
-			log.debug("connection closed to "+Settings.socketAddress(socket));
+			log.debug("connection closed to "+ getIPAddressWithPort());
 			Control.getInstance().connectionClosed(this);
 			in.close();
 		} catch (IOException e) {
-			log.error("connection "+Settings.socketAddress(socket)+" closed with exception: "+e);
+			log.error("connection "+getIPAddressWithPort()+" closed with exception: "+e);
 			Control.getInstance().connectionClosed(this);
 		}
 		open=false;
@@ -128,5 +128,16 @@ public class Connection extends Thread {
 
 	public void setRemoteLitenerPort(Long remoteLitenerPort) {
 		this.remoteLitenerPort = remoteLitenerPort;
+	}
+	
+	public String getIPAddress () {
+		String IP = getSocket().getInetAddress().toString();
+		// if the server is in same IP address with current server, then get the current external IP
+		return IP.equals("/127.0.0.1") ? Settings.getIp() : IP.substring(1, IP.length()-1);
+	}
+	
+	public String getIPAddressWithPort () {
+		String IP = getIPAddress();
+		return IP + ":" + socket.getPort();
 	}
 }
