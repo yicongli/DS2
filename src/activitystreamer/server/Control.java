@@ -762,6 +762,8 @@ public class Control extends Thread {
 				}
         		else {
         			// if this server is the first sibling, then treat itself as the new root server
+            		Settings.setRemoteHostname(null);
+        			Settings.setRemotePort(0);
 					resetReconnectOperation();
 					return false;
 				}
