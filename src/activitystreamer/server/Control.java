@@ -75,7 +75,7 @@ public class Control extends Thread {
 				newCon.setIsServer(true);		// set flag of server
 				newCon.setIsRemoteServer(true); // set if this server is the remote server
 				authenticateRequest(newCon);	// send authentication to the parent server
-				reconnectTime = 0;				// if reconnect success, then reset the reconnect time
+				resetReconnectOperation();
 			} catch (IOException e) {
 				log.error("failed to make connection to " 
 							+ Settings.getRemoteHostname() + ":"
@@ -678,6 +678,7 @@ public class Control extends Thread {
 
 		// if find the info exist in Arraylist, then replace the info
 		// else add to local storage.
+		con.setRemoteLitenerPort((Long)msgObj.get("port"));
 		if (sameInfoIndex != -1) {
 			announcementInfo.set(sameInfoIndex, msgObj);
 		} else {
@@ -730,9 +731,11 @@ public class Control extends Thread {
 	 * reset reconnect timer and time record
 	 */
 	public synchronized void resetReconnectOperation () {
-		reconnectTime = 0;
-		reconnectTimer.stop();
-		reconnectTimer = null;
+		if (reconnectTimer != null) {
+			reconnectTime = 0;
+			reconnectTimer.stop();
+			reconnectTimer = null;
+		}
 	}
 	
 	/*
@@ -896,24 +899,16 @@ public class Control extends Thread {
 		ArrayList<JSONObject> childrenInfo = new ArrayList<JSONObject>();
 		for (Connection con : connections) {
 			// filter con of children server
-			if (con.getIsServer() && !con.getIsRemoteServer()) {
+			if (con.getIsServer() && !con.getIsRemoteServer() && con.getRemoteLitenerPort() != 0) {
 				String IP = con.getSocket().getInetAddress().toString();
 				// if the server is in same IP address with current server, then get the current external IP
 				String compareIP = IP.equals("/127.0.0.1") ? Settings.getIp() : IP.substring(1, IP.length()-1);
-				
-				// get listen port number from announcement information
-				Predicate<? super JSONObject> filter = s -> ((String)s.get("hostname")).equals(compareIP);
-				List<JSONObject> curItem = announcementInfo.stream().filter(filter).collect(Collectors.toList());
-				
-				if (curItem.size() > 0) {
-					JSONObject item = (JSONObject) curItem.get(0);
-					JSONObject info = new JSONObject();
-					info.put("hostname", compareIP);
-					info.put("port", (Long)item.get("port"));
-					
-					childrenInfo.add(info);
-				}
 
+				JSONObject info = new JSONObject();
+				info.put("hostname", compareIP);
+				info.put("port", con.getRemoteLitenerPort());
+				
+				childrenInfo.add(info);
 			}
 		}
 		

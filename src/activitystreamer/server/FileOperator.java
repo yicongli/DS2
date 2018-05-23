@@ -81,6 +81,11 @@ public class FileOperator {
 	 * get all user info 
 	 */
 	public static synchronized JSONObject allUserInfo() {
+		File f = new File(FileOperator.fileName);
+		if (!f.exists()) {
+			createNewFile(f);
+		}
+		
 		try {
 			Reader in = new FileReader(FileOperator.fileName);
 			JSONObject userlist = (JSONObject) Control.parser.parse(in);

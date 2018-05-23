@@ -27,6 +27,7 @@ public class Connection extends Thread {
 	private boolean isServer = false; 		// indicate if the connection is client, default is not sever
 	private boolean isRemoteServer = false; // indicate if the connection is the remote server of current server
 	private String secrete  = ""; 			// store the secrete for Server
+	private Long   remoteLitenerPort = (long) 0; // the listener port of remote server
 	
 	Connection(Socket socket) throws IOException{
 		in = new DataInputStream(socket.getInputStream());
@@ -119,5 +120,13 @@ public class Connection extends Thread {
 
 	public void setIsRemoteServer(boolean isRServer) {
 		this.isRemoteServer = isRServer;
+	}
+
+	public Long getRemoteLitenerPort() {
+		return remoteLitenerPort;
+	}
+
+	public void setRemoteLitenerPort(Long remoteLitenerPort) {
+		this.remoteLitenerPort = remoteLitenerPort;
 	}
 }
