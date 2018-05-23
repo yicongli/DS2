@@ -3,7 +3,6 @@ package activitystreamer.util;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.net.Socket;
 import java.net.SocketException;
 import java.security.SecureRandom;
 import java.util.Enumeration;
