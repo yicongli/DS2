@@ -4,6 +4,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Date;
@@ -69,8 +70,10 @@ public class Control extends Thread {
 		// make a connection to another server if remote hostname is supplied
 		if (Settings.getRemoteHostname() != null) {
 			try {
-				Connection newCon = outgoingConnection(
-						new Socket(Settings.getRemoteHostname(), Settings.getRemotePort()));
+				Socket newSocket = new Socket();
+				InetSocketAddress address = new InetSocketAddress(Settings.getRemoteHostname(), Settings.getRemotePort());
+				newSocket.connect(address, 5000);
+				Connection newCon = outgoingConnection(newSocket);
 				
 				newCon.setIsServer(true);		// set flag of server
 				newCon.setIsRemoteServer(true); // set if this server is the remote server
@@ -609,8 +612,7 @@ public class Control extends Thread {
 			msgObjFinal.put("command", "ACTIVITY_BROADCAST");
 			msgObjFinal.put("activity", activity_message);
 			// add time stamp and index
-			long timeInterval = new Date().getTime();
-			msgObjFinal.put("timestamp", new Long(timeInterval));
+			msgObjFinal.put("timestamp", new Long(new Date().getTime()));
 			msgObjFinal.put("index", new Integer(latestIndex));
 
 			broadcastMessage(con, msgObjFinal.toJSONString(), false);

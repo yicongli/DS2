@@ -65,6 +65,10 @@ public class UserManager {
 			}
 		}
 		
+		if (curUserInfo != null) {
+			getLoginUserInfos().remove(curUserInfo);
+		}
+		
 		return curUserInfo != null;
 	}
 }
