@@ -130,7 +130,7 @@ public class UserManager {
 	
 	/*
 	 * check if need to store message for the log out user 
-	 * Assumption: 
+	 * Description: 
 	 * after the client log out, the client could log in to any server in the system again
 	 * so every server should store the log out user info, 
 	 * when one server finish sending the message to the client, shoud broadcast to the others to 
@@ -139,9 +139,6 @@ public class UserManager {
 	@SuppressWarnings("unchecked")
 	public void checkIfStoreMessagesForLogoutUser (long time, String jsonStr) {
 		for (LogoutUserInfo userInfo : getLogoutUserInfos()) {
-			if (userInfo.isAnonymous()) {
-				continue;
-			}
 			
 			if (userInfo.getLastLogoutTime() < time) {
 				userInfo.getMessageArray().add(jsonStr);
@@ -151,8 +148,10 @@ public class UserManager {
 				Gson gUserInfo = new Gson();
 				msgObjFinal.put("userinfo", gUserInfo.toJson(userInfo));
 				
-				// boardcast message to all the other servers
-				Control.getInstance().broadcastMessage(null, msgObjFinal.toJSONString(), true);
+				// Broadcasting message to all the other servers,except anonymous
+				if (!userInfo.isAnonymous()) {
+					Control.getInstance().broadcastMessage(null, msgObjFinal.toJSONString(), true);
+				}
 			}
 		}
 	}
@@ -166,7 +165,8 @@ public class UserManager {
 		Boolean hasSameLogoutUser = false;
 		for (LogoutUserInfo logoutUserInfo : getLogoutUserInfos()) {
 			if (logoutUserInfo.equals(userInfo)) {
-				// add all comming message into array
+				hasSameLogoutUser = true;
+				// add all coming message into array
 				logoutUserInfo.getMessageArray().addAll(userInfo.getMessageArray());
 				// remove redundant data
 				Set<String> set = new HashSet<String>();
@@ -200,6 +200,7 @@ public class UserManager {
 			}
 		}
 		
+		// if don't have same logout user, then save the user info directly
 		if (!hasSameLogoutUser) {
 			getLogoutUserInfos().add(userInfo);
 		}
