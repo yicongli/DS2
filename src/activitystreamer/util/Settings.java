@@ -3,7 +3,6 @@ package activitystreamer.util;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.net.Socket;
 import java.net.SocketException;
 import java.security.SecureRandom;
 import java.util.Enumeration;
@@ -119,10 +118,6 @@ public class Settings {
 
 	public static void setParentPortOfRemote(int parentPort) {
 		Settings.parentPortOfRemote = parentPort;
-	}
-
-	public static String socketAddress(Socket socket){
-		return socket.getInetAddress()+":"+socket.getPort();
 	}
 
 	public static String nextSecret() {

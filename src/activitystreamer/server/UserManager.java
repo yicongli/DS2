@@ -1,15 +1,16 @@
 package activitystreamer.server;
 import java.util.ArrayList;
-import activitystreamer.util.Settings;
 
 public class UserManager {
 	
 	private ArrayList<LogoutUserInfo> logoutUserInfos = null;
 	private ArrayList<LoginUserInfo> loginUserInfos = null;
+	private ArrayList<UserInfo> incomeMessageInfos = null;
 	
 	public UserManager() {
 		setLogoutUserInfos(new ArrayList<LogoutUserInfo>());
 		setLoginUserInfos(new ArrayList<LoginUserInfo>());
+		setIncomeMessageInfos(new ArrayList<UserInfo>());
 	}
 	
 	public synchronized ArrayList<LoginUserInfo> getLoginUserInfos() {
@@ -28,9 +29,16 @@ public class UserManager {
 		this.logoutUserInfos = logoutUserInfos;
 	}
 	
+	public ArrayList<UserInfo> getIncomeMessageInfos() {
+		return incomeMessageInfos;
+	}
+
+	public void setIncomeMessageInfos(ArrayList<UserInfo> incomeMessageInfos) {
+		this.incomeMessageInfos = incomeMessageInfos;
+	}
+
 	public synchronized void saveLogoutTime(LoginUserInfo userInfo) {
-		String ip = Settings.socketAddress(userInfo.getConnection().getSocket());
-		logoutUserInfos.add(new LogoutUserInfo(userInfo.getUsername(), userInfo.getSecret(), ip));
+		logoutUserInfos.add(new LogoutUserInfo(userInfo.getUsername(), userInfo.getSecret(), userInfo.getIpAddress()));
 	}
 	
 	public synchronized void addNewLoginUserInfo(String username, String secret, Connection con) {
@@ -57,6 +65,10 @@ public class UserManager {
 	 * remove login user when connection lost or receive logout message
 	 */
 	public synchronized boolean removeLoginUserInfo (Connection con) {
+		if (con.getIsServer()) {
+			return false;
+		}
+		
 		LoginUserInfo curUserInfo = null;
 		for (LoginUserInfo userInfo : getLoginUserInfos()) {
 			if (userInfo.getConnection().equals(con)) {

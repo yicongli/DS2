@@ -72,6 +72,7 @@ public class Control extends Thread {
 			try {
 				Socket newSocket = new Socket();
 				InetSocketAddress address = new InetSocketAddress(Settings.getRemoteHostname(), Settings.getRemotePort());
+				// connect time out is shorter than reconnect interval
 				newSocket.connect(address, 5000);
 				Connection newCon = outgoingConnection(newSocket);
 				
@@ -153,9 +154,7 @@ public class Control extends Thread {
 				continue;
 			}
 
-			String conAddress = Settings.socketAddress(con.getSocket());
-			String broadcastAddress = Settings.socketAddress(broadcastCon.getSocket());
-			if (!conAddress.equals(broadcastAddress)) {
+			if (con != broadcastCon) {
 				broadcastCon.writeMsg(msg);
 				broadcastTime++;
 			}
@@ -614,6 +613,9 @@ public class Control extends Thread {
 			// add time stamp and index
 			msgObjFinal.put("timestamp", new Long(new Date().getTime()));
 			msgObjFinal.put("index", new Integer(latestIndex));
+			
+			// TODO check what we need in handling the index of user
+			msgObjFinal.put("ip", con.getIPAddressWithPort());
 
 			broadcastMessage(con, msgObjFinal.toJSONString(), false);
 			
@@ -827,8 +829,8 @@ public class Control extends Thread {
 	 * A new incoming connection has been established, and a reference is returned to it
 	 */
 	public synchronized Connection incomingConnection(Socket s) throws IOException {
-		log.debug("incomming connection: " + Settings.socketAddress(s));
 		Connection c = new Connection(s);
+		log.debug("incomming connection: " + c.getIPAddressWithPort());
 		connections.add(c);
 		return c;
 
@@ -838,9 +840,8 @@ public class Control extends Thread {
 	 * A new outgoing connection has been established, and a reference is returned to it
 	 */
 	public synchronized Connection outgoingConnection(Socket s) throws IOException {
-		log.debug("outgoing connection: " + Settings.socketAddress(s));
 		Connection c = new Connection(s);
-
+		log.debug("outgoing connection: " + c.getIPAddressWithPort());
 		connections.add(c);
 		return c;
 	}
@@ -913,12 +914,8 @@ public class Control extends Thread {
 		for (Connection con : connections) {
 			// filter con of children server
 			if (con.getIsServer() && !con.getIsRemoteServer() && con.getRemoteLitenerPort() != 0) {
-				String IP = con.getSocket().getInetAddress().toString();
-				// if the server is in same IP address with current server, then get the current external IP
-				String compareIP = IP.equals("/127.0.0.1") ? Settings.getIp() : IP.substring(1, IP.length()-1);
-
 				JSONObject info = new JSONObject();
-				info.put("hostname", compareIP);
+				info.put("hostname", con.getIPAddress());
 				info.put("port", con.getRemoteLitenerPort());
 				
 				childrenInfo.add(info);
