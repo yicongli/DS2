@@ -796,6 +796,8 @@ public class Control extends Thread {
 		// broadcast here
 		boolean sentToClient = clientInfoManager.checkIfBroadcastToClients(msgObject, con);
 		broadcastMessage(con, msgObject.toJSONString(), sentToClient);
+		
+		//TODO: How to deal with the failure model? need to resend the message?
 		return false;
 	}
 
