@@ -137,7 +137,7 @@ public class Control extends Thread {
 	 * 
 	 * @param onlySever: if ture, then just broadcast to the other servers.
 	 */
-	private synchronized Integer broadcastMessage(Connection con, String msg, boolean onlySever) {
+	public synchronized Integer broadcastMessage(Connection con, String msg, boolean onlySever) {
 		Integer broadcastTime = 0;
 		for (Connection broadcastCon : connections) {
 
@@ -215,7 +215,11 @@ public class Control extends Thread {
 		case "LOCK_ALLOWED":
 			return receiveLockReply(con, msgObject, false);
 		case "USERINFOREPLY":
-			return saveUserInfo(msgObject);
+			return saveUserInfo(con, msgObject);
+		case "LOGOUT_USER_MESSAGE":
+			return saveLogoutUserInfo(con, msgObject);
+		case "DELETE_LOGOUT_USER":
+			return deleteLogoutUserInfo(con, msgObject);
 		default:
 			responseInvalidMsg("command is not exist", con);
 			return true;
@@ -546,7 +550,18 @@ public class Control extends Thread {
 	/*
 	 * save synchronized userinfo into local storage
 	 */
-	private synchronized boolean saveUserInfo(JSONObject msgObj) {
+	private synchronized boolean saveUserInfo(Connection con, JSONObject msgObj) {
+		if (!con.getIsServer()) {
+			responseInvalidMsg("Message received from an unauthenticated server", con);
+			return true;
+		} else if (!msgObj.containsKey("userinfo")) {
+			responseInvalidMsg("Message does not contain the userinfo field", con);
+			return true;
+		} else if (!msgObj.containsKey("logoutUserInfos")) {
+			responseInvalidMsg("Message does not contain the logoutUserInfos field", con);
+			return true;
+		}
+		
 		String jsonString = (String) msgObj.get("userinfo");
 		FileOperator.saveUserInfoToLocal(jsonString);
 		
@@ -561,6 +576,50 @@ public class Control extends Thread {
 		Settings.setParentHostNameOfRemote((String) msgObj.get("remotehostname"));
 		Long portNum = (Long)msgObj.get("remoteport");
 		Settings.setParentPortOfRemote(portNum.intValue());
+		
+		return false;
+	}
+	
+	/*
+	 * save the message that the logged out user missed
+	 */
+	private synchronized boolean saveLogoutUserInfo(Connection con, JSONObject msgObj) {
+		if (!con.getIsServer()) {
+			responseInvalidMsg("Message received from an unauthenticated server", con);
+			return true;
+		} else if (!msgObj.containsKey("userinfo")) {
+			responseInvalidMsg("Message does not contain the userinfo field", con);
+			return true;
+		} 
+		
+		String jsonString = (String) msgObj.get("userinfo");
+		Gson gson = new Gson();
+		Type type = new TypeToken<LogoutUserInfo>(){}.getType();
+		userManager.recieveLogoutUserInfo(gson.fromJson(jsonString, type));
+		return false;
+	}
+	
+	/**
+	 * Delete the local user info
+	 * @param con     the connection sending this message
+	 * @param msgObj  message json object
+	 * @return true: connection unsecured close connection; false: continue connection
+	 */
+	private synchronized boolean deleteLogoutUserInfo(Connection con, JSONObject msgObj) {
+		if (!con.getIsServer()) {
+			responseInvalidMsg("Message received from an unauthenticated server", con);
+			return true;
+		} else if (!msgObj.containsKey("userinfo")) {
+			responseInvalidMsg("Message does not contain the userinfo field", con);
+			return true;
+		} 
+		
+		String jsonString = (String) msgObj.get("userinfo");
+		Gson gson = new Gson();
+		Type type = new TypeToken<LogoutUserInfo>(){}.getType();
+		userManager.getLogoutUserInfos().remove(gson.fromJson(jsonString, type));
+		
+		broadcastMessage(con, msgObj.toJSONString(), true);
 		
 		return false;
 	}
@@ -613,8 +672,6 @@ public class Control extends Thread {
 			// add time stamp and index
 			msgObjFinal.put("timestamp", new Long(new Date().getTime()));
 			msgObjFinal.put("index", new Integer(latestIndex));
-			
-			// TODO check what we need in handling the index of user
 			msgObjFinal.put("ip", con.getIPAddressWithPort());
 
 			broadcastMessage(con, msgObjFinal.toJSONString(), false);
@@ -644,6 +701,10 @@ public class Control extends Thread {
 			return true;
 		}
 
+		// check if need to save the activity for logout user info
+		long time = ((Long)msgObject.get("timestamp")).longValue();
+		userManager.checkIfStoreMessagesForLogoutUser(time, message);
+		
 		// broadcast here
 		broadcastMessage(con, msgObject.toJSONString(), false);
 		return false;
