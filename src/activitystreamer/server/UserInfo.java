@@ -71,6 +71,21 @@ public class UserInfo {
 		}
 	}
 	
+	/**
+	 * Identify if the username or ip identify current user information
+	 * @param name income user name
+	 * @param ip   income ip identify
+	 * @return true: is same info; false not the same info
+	 */
+	public boolean isCurrentInfo(String name, String ip) {
+		if (name.equals("anonymous")) {
+			return getIpAddress().equals(ip);
+		}
+		else {
+			return getUsername().equals(name);
+		}
+	}
+	
 	/*
 	 * check if user is anonymous
 	 */
@@ -130,5 +145,40 @@ class LoginUserInfo extends UserInfo {
 	
 	public int increaseIndex () {
 		return ++this.latestIndex;
+	}
+}
+
+/**
+ * Store the user info of income activities
+ * @author yicongli
+ *
+ */
+class IncomeActicityUserInfo extends UserInfo {
+	private int latestIndex = -1;
+	private int firstIndex = 1000;
+	
+	public IncomeActicityUserInfo(String name, Connection con) {
+		super(name, "", con.getIPAddressWithPort());
+	}
+
+	public int getLatestIndex() {
+		return latestIndex;
+	}
+
+	public void setLatestIndex(int latestIndex) {
+		this.latestIndex = latestIndex;
+	}
+
+	public int getFirstIndex() {
+		return firstIndex;
+	}
+
+	public void setFirstIndex(int firstIndex) {
+		this.firstIndex = firstIndex;
+	}
+	
+	public void resetInfo() {
+		this.firstIndex = 1000;
+		this.setMessageArray(new ArrayList<String>());
 	}
 }

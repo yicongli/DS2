@@ -138,11 +138,14 @@ public class Control extends Thread {
 		}
 	}
 
-	/*
-	 * add by yicongLI 20-04-18 : BROADCAST ANNOUNCEMENT OR ACTIVITIES
-	 * 
+	/**
+	 * BROADCAST ANNOUNCEMENT OR ACTIVITIES
 	 * Send the message from the sender to other receivers Receivers can be servers
 	 * and clients or only servers
+	 * @param con the connection from which receive the message, if null, then broadcast to all the other connections
+	 * @param msg broadcast message
+	 * @param onlySever if ture, then just broadcast to the other servers.
+	 * @return broadcast time
 	 */
 	public synchronized Integer broadcastMessage(Connection sender_connection, String msg, boolean send_only_servers) {
 		Integer number_receivers = 0;
@@ -716,7 +719,8 @@ public class Control extends Thread {
 		userManager.checkIfStoreMessagesForLogoutUser(time, message);
 
 		// broadcast here
-		broadcastMessage(con, msgObject.toJSONString(), false);
+		boolean sentToClient = userManager.checkIfBroadcastToClients(msgObject, con);
+		broadcastMessage(con, msgObject.toJSONString(), sentToClient);
 		return false;
 	}
 

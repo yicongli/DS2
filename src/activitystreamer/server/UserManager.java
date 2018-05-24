@@ -13,12 +13,12 @@ public class UserManager {
 	
 	private ArrayList<LogoutUserInfo> logoutUserInfos = null;
 	private ArrayList<LoginUserInfo> loginUserInfos = null;
-	private ArrayList<UserInfo> incomeMessageInfos = null;
+	private ArrayList<IncomeActicityUserInfo> incomeActicityInfos = null;
 	
 	public UserManager() {
 		setLogoutUserInfos(new ArrayList<LogoutUserInfo>());
 		setLoginUserInfos(new ArrayList<LoginUserInfo>());
-		setIncomeMessageInfos(new ArrayList<UserInfo>());
+		setIncomeActicityInfos(new ArrayList<IncomeActicityUserInfo>());
 	}
 	
 	public synchronized ArrayList<LoginUserInfo> getLoginUserInfos() {
@@ -37,12 +37,12 @@ public class UserManager {
 		this.logoutUserInfos = logoutUserInfos;
 	}
 	
-	public ArrayList<UserInfo> getIncomeMessageInfos() {
-		return incomeMessageInfos;
+	public ArrayList<IncomeActicityUserInfo> getIncomeActicityInfos() {
+		return incomeActicityInfos;
 	}
 
-	public void setIncomeMessageInfos(ArrayList<UserInfo> incomeMessageInfos) {
-		this.incomeMessageInfos = incomeMessageInfos;
+	public void setIncomeActicityInfos(ArrayList<IncomeActicityUserInfo> incomeMessageInfos) {
+		this.incomeActicityInfos = incomeMessageInfos;
 	}
 
 	public synchronized void saveLogoutTime(LoginUserInfo userInfo) {
@@ -181,27 +181,7 @@ public class UserManager {
 				logoutUserInfo.setMessageArray(newMessageArray);
 				
 				// sort with time stamp
-				Comparator<String> compare = new Comparator<String>() {
-					@Override  
-		            public int compare(String o1, String o2) {  
-		                JSONObject object1 = null;
-		                JSONObject object2 = null;
-						try {
-							object1 = (JSONObject)Control.parser.parse(o1);
-							object2 = (JSONObject)Control.parser.parse(o2);
-						} catch (ParseException e) {
-							e.printStackTrace();
-						}
-
-		                if((Long)object1.get("timestamp") > (Long)object2.get("timestamp")) { 
-		                    return 1;  
-		                } else {
-		                	return -1;  
-		                }
-		            }
-				};
-				
-				logoutUserInfo.getMessageArray().sort(compare);
+				sortActivityMessageArray(logoutUserInfo.getMessageArray());
 			}
 		}
 		
@@ -209,5 +189,95 @@ public class UserManager {
 		if (!hasSameLogoutUser) {
 			getLogoutUserInfos().add(userInfo);
 		}
+	}
+	
+	private void sortActivityMessageArray(ArrayList<String> messageArray) {
+		Comparator<String> compare = new Comparator<String>() {
+			@Override  
+            public int compare(String o1, String o2) {  
+                JSONObject object1 = null;
+                JSONObject object2 = null;
+				try {
+					object1 = (JSONObject)Control.parser.parse(o1);
+					object2 = (JSONObject)Control.parser.parse(o2);
+				} catch (ParseException e) {
+					e.printStackTrace();
+				}
+
+                if((Long)object1.get("timestamp") > (Long)object2.get("timestamp")) { 
+                    return 1;  
+                } else {
+                	return -1;  
+                }
+            }
+		};
+		
+		messageArray.sort(compare);
+	}
+	
+	/**
+	 * check the index of current activities, if its not the latest activity, then wait for the missing message
+	 * @param msgObject the activity message
+	 * @param sender_connection the connection of sender
+	 * @return true: broadcast to all client; false: prevent broadcast to clients
+	 */
+	public boolean checkIfBroadcastToClients(JSONObject msgObject, Connection sender_connection) {
+		IncomeActicityUserInfo userInfo = null;
+		JSONObject actobj = (JSONObject) msgObject.get("activity");
+		String name = (String) actobj.get("authenticated_user");
+		String ip   = (String) msgObject.get("ip");
+		for (IncomeActicityUserInfo incomeActicityUserInfo : incomeActicityInfos) {
+			if (incomeActicityUserInfo.isCurrentInfo(name, ip)) {
+				userInfo = incomeActicityUserInfo;
+			}
+		}
+		
+		// if did not find the user info, then create a new one
+		boolean newUserInfo = userInfo == null;
+		if (userInfo == null) {
+			userInfo = new IncomeActicityUserInfo(name, sender_connection);
+			incomeActicityInfos.add(userInfo);
+		}
+		
+		int curIndex = ((Integer) msgObject.get("index")).intValue();
+		int latestIndex = userInfo.getLatestIndex();
+		
+		// if current activity the next one of the recorded latest activity, 
+		// or didn't have this user info before, then broadcast directly
+		if (curIndex == latestIndex + 1 || newUserInfo) {
+			userInfo.setLatestIndex(curIndex);
+			return true;
+		}
+		
+		// TODO: how to handle the situation that the server join the system just in the unstable situation?
+		// which may cause that the latestIndex initialised with a message which is not the latest one
+		if (curIndex < latestIndex) {
+			// if current index less than latestIndex, means currently missing message
+			userInfo.getMessageArray().add(msgObject.toJSONString());
+			// 
+			userInfo.setFirstIndex(Math.min(curIndex, userInfo.getFirstIndex()));
+			sortActivityMessageArray(userInfo.getMessageArray());
+			
+			// when get all user info, broaddcast to the connected client
+			// TODO handle the situation that the client has logout during this process
+			if (userInfo.getLatestIndex() - userInfo.getFirstIndex() == userInfo.getMessageArray().size() - 1) {
+				for (String activityMsg : userInfo.getMessageArray()) {
+					// TODO broadcast to all client
+					//Control.getInstance().broadcastMessage(con, msg, onlySever)
+				}
+				
+				userInfo.resetInfo();
+			}
+			
+		} else if (curIndex == latestIndex) {
+			// if the index is similar to the latest index, then ignore the message
+		} else if (curIndex > latestIndex + 1) {
+			// if the index is larger than the latest index+1, then store the message and wait for missing message
+			userInfo.getMessageArray().add(msgObject.toJSONString());
+			userInfo.setLatestIndex(curIndex);
+			userInfo.setFirstIndex(latestIndex);
+		} 
+		
+		return false;
 	}
 }
