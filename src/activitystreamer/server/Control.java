@@ -58,7 +58,7 @@ public class Control extends Thread {
 
 		try {
 			listener = new Listener(); // start a listener
-			initiateConnection(); // initiate connection with remote server
+			start_connection(); // initiate connection with remote server
 			start(); // start regular operation
 		} catch (IOException e1) {
 			log.fatal("failed to startup a listening thread: " + e1);
@@ -66,20 +66,33 @@ public class Control extends Thread {
 		}
 	}
 
-	public void initiateConnection() {
-		// make a connection to another server if remote hostname is supplied
+	/*
+	 * Get the new socket and then create a new connection 
+	 * Add new connection to the list.
+	 */
+	public synchronized Connection outgoingConnection(Socket s) throws IOException {
+		Connection c = new Connection(s);
+		log.debug("outgoing connection: " + c.getIPAddressWithPort());
+		connections.add(c);
+		return c;
+	}
+	
+	/*
+	 * Create a new connection when the server starts
+	 */
+	public void start_connection() {
 		if (Settings.getRemoteHostname() != null) {
 			try {
-				Socket newSocket = new Socket();
+				Socket server_socket = new Socket();
 				InetSocketAddress address = new InetSocketAddress(Settings.getRemoteHostname(),
 						Settings.getRemotePort());
-				// connect time out is shorter than reconnect interval
-				newSocket.connect(address, 5000);
-				Connection newCon = outgoingConnection(newSocket);
-
-				newCon.setIsServer(true); // set flag of server
-				newCon.setIsRemoteServer(true); // set if this server is the remote server
-				authenticateRequest(newCon); // send authentication to the parent server
+				// connection timeout is less than reconnection time
+				server_socket.connect(address, 5000);
+				
+				Connection new_connection = outgoingConnection(server_socket);
+				new_connection.setIsServer(true); 		// set flag of server
+				new_connection.setIsRemoteServer(true); // set if this server is the remote server
+				request_authentication(new_connection); 	// send authentication to the parent server
 				resetReconnectOperation();
 			} catch (IOException e) {
 				log.error("failed to make connection to " + Settings.getRemoteHostname() + ":"
@@ -88,27 +101,24 @@ public class Control extends Thread {
 		}
 	}
 
-	/*
-	 * send authenticate include: S-S
-	 * 
+	/* SEND AUTHENTICATION REQUEST
 	 * @secret: the secret of server system
-	 * 
 	 * @port: the listening port of current server
 	 */
 	@SuppressWarnings("unchecked")
-	private synchronized void authenticateRequest(Connection outCon) {
+	private synchronized void request_authentication(Connection receiver_connection) {
 		JSONObject msgObj = new JSONObject();
 		msgObj.put("command", "AUTHENTICATE");
 		msgObj.put("secret", Settings.getServerSecret());
 		msgObj.put("port", Settings.getLocalPort());
-		outCon.writeMsg(msgObj.toJSONString());
+		receiver_connection.writeMsg(msgObj.toJSONString());
 	}
 
 	/*
 	 * add by yicongLI 23-04-18 send lock request when register a new account
 	 */
 	@SuppressWarnings("unchecked")
-	private synchronized void lockRequest(String username, String secret, Connection client_connection) {
+	private synchronized void lock_request(String username, String secret, Connection client_connection) {
 		JSONObject msgObj = new JSONObject();
 		msgObj.put("command", "LOCK_REQUEST");
 		msgObj.put("username", username);
@@ -428,8 +438,8 @@ public class Control extends Thread {
 			registerFail(username, con);
 			return true;
 		} else {
-			// Send lock request by invoking lockRequest function
-			lockRequest(username, secret, con);
+			// Send lock request by invoking lock_request function
+			lock_request(username, secret, con);
 			return false;
 		}
 	}
@@ -782,7 +792,7 @@ public class Control extends Thread {
 			public void actionPerformed(ActionEvent evt) {
 				// if fail to change status, then don't reconnect the server
 				if (changeReconnectStatus()) {
-					initiateConnection();
+					start_connection();
 				}
 			}
 		};
@@ -898,17 +908,6 @@ public class Control extends Thread {
 		connections.add(c);
 		return c;
 
-	}
-
-	/*
-	 * A new outgoing connection has been established, and a reference is returned
-	 * to it
-	 */
-	public synchronized Connection outgoingConnection(Socket s) throws IOException {
-		Connection c = new Connection(s);
-		log.debug("outgoing connection: " + c.getIPAddressWithPort());
-		connections.add(c);
-		return c;
 	}
 
 	@Override
