@@ -1,4 +1,9 @@
-/* Read and write to json file (local storage of the servers)
+/* Purpose: do the operations in the local storage (json file)
+ * 
+ * 1. Get all user info in the file
+ * 2. Save user info to the file
+ * 3. Delete user info from the file
+ * 4. Check if user is existed in file
  */
 
 
@@ -30,6 +35,30 @@ public class FileOperator {
 			e.printStackTrace();
 		}
 	} 
+	
+	/*
+	 * get all user info 
+	 */
+	public static synchronized JSONObject allUserInfo() {
+		File f = new File(FileOperator.fileName);
+		if (!f.exists()) {
+			createNewFile(f);
+		}
+		
+		try {
+			Reader in = new FileReader(FileOperator.fileName);
+			JSONObject userlist = (JSONObject) Control.parser.parse(in);
+			return userlist;
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+		
+		return new JSONObject();
+	}
 	
 	/*
 	 * create by yicongLI 14-05-2018
@@ -75,30 +104,6 @@ public class FileOperator {
 		
 		// username is not found
 		return null;
-	}
-	
-	/*
-	 * get all user info 
-	 */
-	public static synchronized JSONObject allUserInfo() {
-		File f = new File(FileOperator.fileName);
-		if (!f.exists()) {
-			createNewFile(f);
-		}
-		
-		try {
-			Reader in = new FileReader(FileOperator.fileName);
-			JSONObject userlist = (JSONObject) Control.parser.parse(in);
-			return userlist;
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (ParseException e) {
-			e.printStackTrace();
-		}
-		
-		return new JSONObject();
 	}
 	
 	/*
