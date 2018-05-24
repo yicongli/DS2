@@ -613,6 +613,9 @@ public class Control extends Thread {
 			// add time stamp and index
 			msgObjFinal.put("timestamp", new Long(new Date().getTime()));
 			msgObjFinal.put("index", new Integer(latestIndex));
+			
+			// TODO check what we need in handling the index of user
+			msgObjFinal.put("ip", con.getIPAddressWithPort());
 
 			broadcastMessage(con, msgObjFinal.toJSONString(), false);
 			
