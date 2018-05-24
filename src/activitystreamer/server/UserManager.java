@@ -44,10 +44,6 @@ public class UserManager {
 	public void setIncomeActicityInfos(ArrayList<IncomeActicityUserInfo> incomeMessageInfos) {
 		this.incomeActicityInfos = incomeMessageInfos;
 	}
-
-	public synchronized void saveLogoutTime(LoginUserInfo userInfo) {
-		logoutUserInfos.add(new LogoutUserInfo(userInfo.getUsername(), userInfo.getSecret(), userInfo.getIpAddress()));
-	}
 	
 	/**
 	 * Add the login user information to the storage and check if need to send cache activities to the client
@@ -119,7 +115,7 @@ public class UserManager {
 		for (LoginUserInfo userInfo : getLoginUserInfos()) {
 			if (userInfo.getConnection().equals(con)) {
 				curUserInfo = userInfo;
-				saveLogoutTime(userInfo);
+				logoutUserInfos.add(new LogoutUserInfo(userInfo.getUsername(), userInfo.getSecret(), userInfo.getIpAddress()));
 			}
 		}
 		
@@ -139,12 +135,29 @@ public class UserManager {
 	 * delete the message cache
 	 */
 	@SuppressWarnings("unchecked")
-	public void checkIfStoreMessagesForLogoutUser (long time, String jsonStr) {
-		for (LogoutUserInfo userInfo : getLogoutUserInfos()) {
-			
-			if (userInfo.getLastLogoutTime() < time) {
-				userInfo.getMessageArray().add(jsonStr);
+	public void checkIfStoreMessagesForLogoutUser (ArrayList<String> jsonStrArray) {
+		for (String jsonStr : jsonStrArray) {
+			// check invalids
+			JSONObject msgObject = null;
+			try {
+				msgObject = (JSONObject) Control.parser.parse(jsonStr);
+			} catch (Exception e) {
 				
+				e.printStackTrace();
+			}
+			
+			long time = ((Long) msgObject.get("timestamp")).longValue();
+			
+			for (LogoutUserInfo userInfo : getLogoutUserInfos()) {
+				
+				if (userInfo.getLastLogoutTime() < time) {
+					userInfo.getMessageArray().add(jsonStr);
+				}
+			}
+		}
+		
+		for (LogoutUserInfo userInfo : getLogoutUserInfos()) {
+			if (userInfo.isNeedToSynchronize()) {
 				JSONObject msgObjFinal = new JSONObject();
 				msgObjFinal.put("command", "LOGOUT_USER_MESSAGE");
 				Gson gUserInfo = new Gson();
@@ -187,6 +200,7 @@ public class UserManager {
 		
 		// if don't have same logout user, then save the user info directly
 		if (!hasSameLogoutUser) {
+			userInfo.setLogoutFromCurrentServer(false);
 			getLogoutUserInfos().add(userInfo);
 		}
 	}
@@ -259,13 +273,15 @@ public class UserManager {
 			sortActivityMessageArray(userInfo.getMessageArray());
 			
 			// when get all user info, broaddcast to the connected client
-			// TODO handle the situation that the client has logout during this process
+			// TODO handle the situation that 
 			if (userInfo.getLatestIndex() - userInfo.getFirstIndex() == userInfo.getMessageArray().size() - 1) {
 				for (String activityMsg : userInfo.getMessageArray()) {
-					// TODO broadcast to all client
-					//Control.getInstance().broadcastMessage(con, msg, onlySever)
+					broadcastMessageToClient(activityMsg);
 				}
 				
+				// if any the client has logout during this process, server should store the message for them
+				// and send these message when the client re-login
+				checkIfStoreMessagesForLogoutUser(userInfo.getMessageArray());
 				userInfo.resetInfo();
 			}
 			
@@ -279,5 +295,21 @@ public class UserManager {
 		} 
 		
 		return false;
+	}
+	
+	/**
+	 * BROADCAST message to client
+	 * Send the message to all connected client
+	 */
+	public synchronized void broadcastMessageToClient(String message) {
+		for (Connection receiver_connection : Control.connections) {
+
+			// only broadcast to client
+			if (receiver_connection.getIsServer()) {
+				continue;
+			}
+
+			receiver_connection.writeMsg(message);
+		}
 	}
 }

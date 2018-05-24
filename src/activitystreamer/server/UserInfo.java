@@ -100,6 +100,8 @@ public class UserInfo {
 class LogoutUserInfo extends UserInfo {
 
 	private long lastLogoutTime = 0;
+	private boolean logoutFromCurrentServer = true;
+	private boolean needToSynchronize = false;
 	
 	public LogoutUserInfo(String name, String sec, String ip) {
 		super(name, sec, ip);
@@ -112,6 +114,22 @@ class LogoutUserInfo extends UserInfo {
 	
 	public void setLastLogoutTime(long lastLogoutTime) {
 		this.lastLogoutTime = lastLogoutTime;
+	}
+
+	public boolean isLogoutFromCurrentServer() {
+		return logoutFromCurrentServer;
+	}
+
+	public void setLogoutFromCurrentServer(boolean logoutFromCurrentServer) {
+		this.logoutFromCurrentServer = logoutFromCurrentServer;
+	}
+
+	public boolean isNeedToSynchronize() {
+		return needToSynchronize;
+	}
+
+	public void setNeedToSynchronize(boolean needToSynchronize) {
+		this.needToSynchronize = needToSynchronize;
 	}
 }
 
