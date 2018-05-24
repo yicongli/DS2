@@ -11,9 +11,9 @@ import com.google.gson.Gson;
 
 public class ClientInfoManager {
 	
-	private ArrayList<LogoutClientInfo> logoutClientInfos = null;
-	private ArrayList<LoginClientInfo> loginClientnfos = null;
-	private ArrayList<IncomeActicityClientInfo> incomeActicityInfos = null;
+	private ArrayList<LogoutClientInfo> logoutClientInfos = null;	// the client that has logged out from system
+	private ArrayList<LoginClientInfo> loginClientnfos = null;		// the client that currently login the server
+	private ArrayList<IncomeActicityClientInfo> incomeActicityInfos = null; // the activity info that current server received 
 	
 	public ClientInfoManager() {
 		setLogoutClientInfos(new ArrayList<LogoutClientInfo>());
@@ -46,7 +46,8 @@ public class ClientInfoManager {
 	}
 	
 	/**
-	 * Add the login user information to the storage and check if need to send cache activities to the client
+	 * Add the login user information to the storage and 
+	 * check if need to send cache activities to the client
 	 * @param username 	current user's username
 	 * @param secret	current user's secret
 	 * @param con		current user's con
@@ -67,19 +68,21 @@ public class ClientInfoManager {
 		// if has remove the user from user info and sent stored user activities to this client
 		if (oldClient != null) {
 			getLogoutClientInfos().remove(oldClient);
+			
 			for (String message : oldClient.getMessageArray()) {
 				con.writeMsg(message);
 			}
 			
-			// Broadcast deleting logout user info
+			// Broadcast deleting logout user info message to all the other servers
 			JSONObject msgObj = new JSONObject();
 			msgObj.put("command", "DELETE_LOGOUT_USER");
 			Gson gUserInfo = new Gson();
 			msgObj.put("userInfo", gUserInfo.toJson(oldClient));
 			
 			String msgStr = msgObj.toJSONString();
-			Control.log.debug(msgStr);
 			Control.getInstance().broadcastMessage(null, msgStr, true);
+			
+			Control.log.debug(msgStr);
 		}
 	}
 	
@@ -103,8 +106,10 @@ public class ClientInfoManager {
 		return latestIndex;
 	}
 	
-	/*
+	/**
 	 * remove login user when connection lost or receive logout message
+	 * @param con the connection with client
+	 * @return if removed the login client info from manager
 	 */
 	public synchronized boolean removeLoginClientInfo (Connection con) {
 		if (con.getIsServer()) {
@@ -115,9 +120,7 @@ public class ClientInfoManager {
 		for (LoginClientInfo clientInfo : getLoginClientInfos()) {
 			if (clientInfo.getConnection().equals(con)) {
 				curClientInfo = clientInfo;
-				LogoutClientInfo info = new LogoutClientInfo(clientInfo.getUsername(), 
-																clientInfo.getSecret(), 
-																clientInfo.getIpAddress());
+				LogoutClientInfo info = new LogoutClientInfo(clientInfo.getUsername(), clientInfo.getIpAddress());
 				logoutClientInfos.add(info);
 			}
 		}
@@ -134,13 +137,13 @@ public class ClientInfoManager {
 	 * Description: 
 	 * after the client log out, the client could log in to any server in the system again
 	 * so every server should store the log out user info, 
-	 * when one server finish sending the message to the client, shoud broadcast to the others to 
+	 * when one server finish sending the message to the client, should broadcast to the others to 
 	 * delete the message cache
 	 */
 	@SuppressWarnings("unchecked")
 	public void checkIfStoreMessagesForLogoutClient (ArrayList<String> jsonStrArray) {
 		for (String jsonStr : jsonStrArray) {
-			// check invalids
+			// parse the message 
 			JSONObject msgObject = null;
 			try {
 				msgObject = (JSONObject) Control.parser.parse(jsonStr);
@@ -149,24 +152,27 @@ public class ClientInfoManager {
 				e.printStackTrace();
 			}
 			
+			// get the time stamp of message
 			long time = ((Long) msgObject.get("timestamp")).longValue();
-			
+			// if any client logout before the message sent, and logout from current server 
+			// then add the message to the cache
 			for (LogoutClientInfo clientInfo : getLogoutClientInfos()) {
-				
-				if (clientInfo.getLastLogoutTime() < time) {
+				if (clientInfo.getLastLogoutTime() < time 
+						&& clientInfo.isLogoutFromCurrentServer()) {
 					clientInfo.getMessageArray().add(jsonStr);
 				}
 			}
 		}
 		
+		// if the client logout from current server, then broadcast logout info to all the other server
 		for (LogoutClientInfo clientInfo : getLogoutClientInfos()) {
-			if (clientInfo.isNeedToSynchronize()) {
+			if (clientInfo.isLogoutFromCurrentServer()) {
 				JSONObject msgObjFinal = new JSONObject();
 				msgObjFinal.put("command", "LOGOUT_USER_MESSAGE");
 				Gson gClientInfo = new Gson();
 				msgObjFinal.put("userinfo", gClientInfo.toJson(clientInfo));
 				
-				// Broadcasting message to all the other servers,except anonymous
+				// Broadcasting message to all the other servers, except anonymous
 				String broadcastStr = msgObjFinal.toJSONString();
 				if (!clientInfo.isAnonymous()) {
 					Control.getInstance().broadcastMessage(null, msgObjFinal.toJSONString(), true);
@@ -183,10 +189,10 @@ public class ClientInfoManager {
 	 *  Hasn't: add user to the local storage directly
 	 */
 	public synchronized void recieveLogoutClientInfo(LogoutClientInfo clientInfo) {
-		Boolean hasSameLogoutClient = false;
+		Boolean findLogoutClient = false;
 		for (LogoutClientInfo logoutClientInfo : getLogoutClientInfos()) {
 			if (logoutClientInfo.equals(clientInfo)) {
-				hasSameLogoutClient = true;
+				findLogoutClient = true;
 				// add all coming message into array
 				logoutClientInfo.getMessageArray().addAll(clientInfo.getMessageArray());
 				// remove redundant data
@@ -202,12 +208,16 @@ public class ClientInfoManager {
 		}
 		
 		// if don't have same logout user, then save the user info directly
-		if (!hasSameLogoutClient) {
+		if (!findLogoutClient) {
 			clientInfo.setLogoutFromCurrentServer(false);
 			getLogoutClientInfos().add(clientInfo);
 		}
 	}
 	
+	/**
+	 * Sort activity message array with time stamp
+	 * @param messageArray
+	 */
 	private void sortActivityMessageArray(ArrayList<String> messageArray) {
 		Comparator<String> compare = new Comparator<String>() {
 			@Override  
@@ -220,7 +230,7 @@ public class ClientInfoManager {
 				} catch (ParseException e) {
 					e.printStackTrace();
 				}
-
+				// compare with timestamp
                 if((Long)object1.get("timestamp") > (Long)object2.get("timestamp")) { 
                     return 1;  
                 } else {
@@ -240,9 +250,11 @@ public class ClientInfoManager {
 	 */
 	public boolean checkIfBroadcastToClients(JSONObject msgObject, Connection sender_connection) {
 		IncomeActicityClientInfo clientInfo = null;
+		
 		JSONObject actobj = (JSONObject) msgObject.get("activity");
 		String name = (String) actobj.get("authenticated_user");
 		String ip   = (String) msgObject.get("ip");
+		// check if local has income activity info
 		for (IncomeActicityClientInfo incomeActicityClientInfo : incomeActicityInfos) {
 			if (incomeActicityClientInfo.isCurrentInfo(name, ip)) {
 				clientInfo = incomeActicityClientInfo;
@@ -268,15 +280,17 @@ public class ClientInfoManager {
 		
 		// TODO: how to handle the situation that the server join the system just in the unstable situation?
 		// which may cause that the latestIndex initialised with a message which is not the latest one
+		
+		
+		
 		if (curIndex < latestIndex) {
 			// if current index less than latestIndex, means currently missing message
 			clientInfo.getMessageArray().add(msgObject.toJSONString());
-			// 
+			// save the minimum one of curIndex and firstindex stored in local storage
 			clientInfo.setFirstIndex(Math.min(curIndex, clientInfo.getFirstIndex()));
 			sortActivityMessageArray(clientInfo.getMessageArray());
 			
-			// when get all user info, broaddcast to the connected client
-			// TODO handle the situation that 
+			// when get all user info, broadcast to the connected client
 			if (clientInfo.getLatestIndex() - clientInfo.getFirstIndex() == clientInfo.getMessageArray().size() - 1) {
 				for (String activityMsg : clientInfo.getMessageArray()) {
 					broadcastMessageToClient(activityMsg);
@@ -285,6 +299,7 @@ public class ClientInfoManager {
 				// if any the client has logout during this process, server should store the message for them
 				// and send these message when the client re-login
 				checkIfStoreMessagesForLogoutClient(clientInfo.getMessageArray());
+				// reset the message cache
 				clientInfo.resetInfo();
 			}
 			

@@ -30,13 +30,13 @@ public class Control extends Thread {
 	public static ArrayList<Connection> connections;
 	private static boolean term = false;
 	private static Listener listener;
-	private static ArrayList<JSONObject> announcementInfo; // the announcement Info from the other server
-	private static String uniqueID; // the Identification of current server
-	private static ArrayList<LockItem> lockItemArray; // the items handling the lock request
-	public static JSONParser parser; // the parser to parse the JSON data
+	private static ArrayList<JSONObject> announcementInfo; 	// the announcement Info from the other server
+	private static String uniqueID; 						// the Identification of current server
+	private static ArrayList<LockItem> lockItemArray; 		// the items handling the lock request
+	public static JSONParser parser; 						// the parser to parse the JSON data
 	public static ClientInfoManager clientInfoManager = null; // UserInfo manager
-	private static int reconnectTime = 0; // Reconnect time
-	private static Timer reconnectTimer = null; // Reconnect timer
+	private static int reconnectTime = 0; 					// Reconnect time
+	private static Timer reconnectTimer = null; 			// Reconnect timer
 
 	protected static Control control = null;
 
@@ -49,17 +49,17 @@ public class Control extends Thread {
 
 	public Control() {
 
-		connections = new ArrayList<Connection>(); // initialize the connections item array
+		connections = new ArrayList<Connection>(); 		// initialize the connections item array
 		announcementInfo = new ArrayList<JSONObject>(); // initialize the announcement item array
-		lockItemArray = new ArrayList<LockItem>(); // initialize the lock item array
-		clientInfoManager = new ClientInfoManager(); // manage login/logout user info
-		parser = new JSONParser(); // initialize parser and remote connection
+		lockItemArray = new ArrayList<LockItem>();		 // initialize the lock item array
+		clientInfoManager = new ClientInfoManager(); 	// manage login/logout user info
+		parser = new JSONParser(); 						// initialize parser and remote connection
 		uniqueID = Settings.nextSecret();
 
 		try {
-			listener = new Listener(); // start a listener
-			start_connection(); // initiate connection with remote server
-			start(); // start regular operation
+			listener = new Listener(); 	// start a listener
+			start_connection(); 		// initiate connection with remote server
+			start(); 					// start regular operation
 		} catch (IOException e1) {
 			log.fatal("failed to startup a listening thread: " + e1);
 			System.exit(-1);
@@ -142,7 +142,8 @@ public class Control extends Thread {
 	 * BROADCAST ANNOUNCEMENT OR ACTIVITIES
 	 * Send the message from the sender to other receivers Receivers can be servers
 	 * and clients or only servers
-	 * @param sender_connection the connection from which receive the message, if null, then broadcast to all the other connections
+	 * @param sender_connection the connection from which receive the message, 
+	 * 							if null, then broadcast to all the other connections
 	 * @param msg 				broadcast message
 	 * @param send_only_servers if ture, then just broadcast to the other servers.
 	 * @return broadcast time
@@ -283,7 +284,7 @@ public class Control extends Thread {
 		if (localsecret != null && localsecret.equals(secret)) {
 			cmd = "LOGIN_SUCCESS";
 			info = "logged in as user " + username;
-			;
+			// store the login client information
 			clientInfoManager.addNewLoginClientInfo(username, secret, con);
 			responseMsg(cmd, info, con);
 
@@ -304,7 +305,7 @@ public class Control extends Thread {
 	}
 
 	/*
-	 * to define the redirectionLogin
+	 * redirect client to the new server
 	 */
 	@SuppressWarnings("unchecked")
 	private boolean redirectionLogin(Connection con) {
@@ -362,10 +363,9 @@ public class Control extends Thread {
 			return true;
 		}
 
-		// No reply if the authentication succeeded
 		con.setIsServer(true);
 		con.setSecret(Settings.getServerSecret());
-
+		// reply current server data to the new server
 		userInfoReply(con);
 		return false;
 	}
@@ -575,12 +575,15 @@ public class Control extends Thread {
 		// store logout user info into userManager
 		jsonString = (String) msgObj.get("logoutUserInfos");
 		Gson gson = new Gson();
-		Type type = new TypeToken<ArrayList<LogoutClientInfo>>() {
-		}.getType();
+		Type type = new TypeToken<ArrayList<LogoutClientInfo>>() {}.getType();
 		ArrayList<LogoutClientInfo> arrayList = gson.fromJson(jsonString, type);
+		for (LogoutClientInfo logoutClientInfo : arrayList) {
+			logoutClientInfo.setLogoutFromCurrentServer(false);
+		}
+		
 		clientInfoManager.setLogoutClientInfos(arrayList);
 
-		// save ParentHostName remote hostname/port
+		// save the remoteHostName of remote host
 		Settings.setParentHostNameOfRemote((String) msgObj.get("remotehostname"));
 		Long portNum = (Long) msgObj.get("remoteport");
 		Settings.setParentPortOfRemote(portNum.intValue());
@@ -602,21 +605,16 @@ public class Control extends Thread {
 
 		String jsonString = (String) msgObj.get("userinfo");
 		Gson gson = new Gson();
-		Type type = new TypeToken<LogoutClientInfo>() {
-		}.getType();
+		Type type = new TypeToken<LogoutClientInfo>() {}.getType();
 		clientInfoManager.recieveLogoutClientInfo(gson.fromJson(jsonString, type));
 		return false;
 	}
 
 	/**
-	 * Delete the local user info
-	 * 
-	 * @param con
-	 *            the connection sending this message
-	 * @param msgObj
-	 *            message json object
-	 * @return true: connection unsecured close connection; false: continue
-	 *         connection
+	 * Delete the local user info 
+	 * @param con the connection sending this message
+	 * @param msgObj  message json object
+	 * @return true: connection unsecured close connection; false: continue  connection
 	 */
 	private synchronized boolean deleteLogoutUserInfo(Connection con, JSONObject msgObj) {
 		if (!con.getIsServer()) {
@@ -629,10 +627,10 @@ public class Control extends Thread {
 
 		String jsonString = (String) msgObj.get("userinfo");
 		Gson gson = new Gson();
-		Type type = new TypeToken<LogoutClientInfo>() {
-		}.getType();
+		Type type = new TypeToken<LogoutClientInfo>() {}.getType();
 		clientInfoManager.getLogoutClientInfos().remove(gson.fromJson(jsonString, type));
 
+		// broadcast message to the other servers
 		broadcastMessage(con, msgObj.toJSONString(), true);
 
 		return false;
@@ -824,16 +822,15 @@ public class Control extends Thread {
 	public synchronized boolean changeReconnectStatus() {
 		// if tick reach the end of whole simulate process
 		reconnectTime++;
-		// if reconnect time larger than 3, then reconnect to parent server of remote
-		// host
+		// if reconnect time smaller than 2 then connect to the original server
+		// if reconnect time larger than 2, then reconnect to parent server of remote host
 		if (reconnectTime == 3) {
 			// if remote server has parent server, then connect to this parent server
 			if (Settings.getParentHostNameOfRemote() != null) {
 				Settings.setRemoteHostname(Settings.getParentHostNameOfRemote());
 				Settings.setRemotePort(Settings.getParentPortOfRemote());
 			} else {
-				// if remote server doesn't have parent server(it is root server), then connect
-				// to first sibling
+				// if remote server doesn't have parent server(it is root server), then connect to first sibling
 				JSONObject serverInfo = findSiblingServer();
 				if (serverInfo != null) {
 					Settings.setRemoteHostname((String) serverInfo.get("hostname"));
@@ -863,7 +860,8 @@ public class Control extends Thread {
 		for (JSONObject jsonObject : announcementInfo) {
 			String hostname = (String) jsonObject.get("hostname");
 			Long port = (Long) jsonObject.get("port");
-
+			
+			// get local remote host
 			String remoteHostname = Settings.getRemoteHostname();
 			int remotePort = Settings.getRemotePort();
 
@@ -881,10 +879,8 @@ public class Control extends Thread {
 				// the Long value will be convert into Double
 				ArrayList<JSONObject> arrayList = childrenServerInfo.fromJson(jsonString, type);
 
-				// all the server connect to the first sibling, the first one become the root
-				// server
-				// if remote server only have one child server, then this server is the new root
-				// server
+				// all the server connect to the first sibling, the first one become the root server
+				// if remote server only have one child server, then this server is the new root server
 				if (arrayList.size() > 1) {
 					// get first sibling server
 					JSONObject serverInfo = arrayList.get(0);
@@ -904,8 +900,7 @@ public class Control extends Thread {
 	}
 
 	/*
-	 * A new incoming connection has been established, and a reference is returned
-	 * to it
+	 * A new incoming connection has been established, and a reference is returned to it
 	 */
 	public synchronized Connection incomingConnection(Socket s) throws IOException {
 		Connection c = new Connection(s);

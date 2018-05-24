@@ -8,15 +8,13 @@ import java.util.Date;
  */
 public class ClientInfo {
 	
-	private ArrayList<String> messageArray = null;
-	private String username = "";
-	private String secret = "";
-	private String ipAddress = "";
+	private ArrayList<String> messageArray = null;	// message array
+	private String username = "";					// user name
+	private String ipAddress = "";					// ip
 	
-	public ClientInfo(String name, String sec, String ip) {
+	public ClientInfo(String name, String ip) {
 		setUsername(name);
 		setIpAddress(ip);
-		setSecret(sec);
 		setMessageArray(new ArrayList<String>());
 	}
 	
@@ -34,14 +32,6 @@ public class ClientInfo {
 	
 	public void setUsername(String username) {
 		this.username = username;
-	}
-	
-	public String getSecret() {
-		return secret;
-	}
-
-	public void setSecret(String secret) {
-		this.secret = secret;
 	}
 	
 	public ArrayList<String> getMessageArray() {
@@ -101,10 +91,9 @@ class LogoutClientInfo extends ClientInfo {
 
 	private long lastLogoutTime = 0;
 	private boolean logoutFromCurrentServer = true;
-	private boolean needToSynchronize = false;
 	
-	public LogoutClientInfo(String name, String sec, String ip) {
-		super(name, sec, ip);
+	public LogoutClientInfo(String name, String ip) {
+		super(name,ip);
 		setLastLogoutTime(new Date().getTime());
 	}
 	
@@ -123,26 +112,20 @@ class LogoutClientInfo extends ClientInfo {
 	public void setLogoutFromCurrentServer(boolean logoutFromCurrentServer) {
 		this.logoutFromCurrentServer = logoutFromCurrentServer;
 	}
-
-	public boolean isNeedToSynchronize() {
-		return needToSynchronize;
-	}
-
-	public void setNeedToSynchronize(boolean needToSynchronize) {
-		this.needToSynchronize = needToSynchronize;
-	}
 }
 
 /*
  * login user Info 
  */
 class LoginClientInfo extends ClientInfo {
-	private Connection connection = null;
+	private Connection connection = null;   // the connection to the client
+	private String secret = "";				// password of current login client
 	private int latestIndex = 0;
 	
 	public LoginClientInfo(String name, String sec, Connection con) {
-		super(name, sec, con.getIPAddressWithPort());
+		super(name, con.getIPAddressWithPort());
 		connection = con;
+		secret = sec;
 	}
 
 	public Connection getConnection() {
@@ -164,6 +147,14 @@ class LoginClientInfo extends ClientInfo {
 	public int increaseIndex () {
 		return ++this.latestIndex;
 	}
+
+	public String getSecret() {
+		return secret;
+	}
+
+	public void setSecret(String secret) {
+		this.secret = secret;
+	}
 }
 
 /**
@@ -172,11 +163,11 @@ class LoginClientInfo extends ClientInfo {
  *
  */
 class IncomeActicityClientInfo extends ClientInfo {
-	private int latestIndex = -1;
-	private int firstIndex = 1000;
+	private int latestIndex = -1;	// the latestIndex of currently received message
+	private int firstIndex = 1000;  // the first index of missing message
 	
 	public IncomeActicityClientInfo(String name, Connection con) {
-		super(name, "", con.getIPAddressWithPort());
+		super(name, con.getIPAddressWithPort());
 	}
 
 	public int getLatestIndex() {
@@ -195,6 +186,9 @@ class IncomeActicityClientInfo extends ClientInfo {
 		this.firstIndex = firstIndex;
 	}
 	
+	/*
+	 * reset information of message to default
+	 */
 	public void resetInfo() {
 		this.firstIndex = 1000;
 		this.setMessageArray(new ArrayList<String>());
