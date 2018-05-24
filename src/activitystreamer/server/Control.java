@@ -124,17 +124,18 @@ public class Control extends Thread {
 		msgObj.put("username", username);
 		msgObj.put("secret", secret);
 
-		Integer numberReceivers = broadcastMessage(null, msgObj.toJSONString(), true);
+		ArrayList<String> receiverIdentifies = broadcastMessage(null, msgObj.toJSONString(), true);
 
 		// if current server has no connected server, then check local storage directly.
-		if (numberReceivers == 0) {
+		if (receiverIdentifies.size() == 0) {
 			if (FileOperator.checkLocalStorage(username) != null) {
 				registerFail(username, clientConnection);
 			} else {
 				registerSuccess(username, secret, clientConnection);
 			}
 		} else {
-			lockItemArray.add(new LockItem(username, clientConnection, numberReceivers));
+			LockItem item = new LockItem(username, secret, clientConnection, receiverIdentifies);
+			lockItemArray.add(item);
 		}
 	}
 
@@ -148,8 +149,8 @@ public class Control extends Thread {
 	 * @param sendOnlyServers if ture, then just broadcast to the other servers.
 	 * @return broadcast time
 	 */
-	public synchronized Integer broadcastMessage(Connection senderConnection, String msg, boolean sendOnlyServers) {
-		Integer numberReceivers = 0;
+	public synchronized ArrayList<String> broadcastMessage(Connection senderConnection, String msg, boolean sendOnlyServers) {
+		ArrayList<String> numberReceivers = new ArrayList<String>();
 		for (Connection receiverConnection : connections) {
 
 			// only broadcast between servers
@@ -160,13 +161,13 @@ public class Control extends Thread {
 			// broadcast to all the receivers
 			if (senderConnection == null) {
 				receiverConnection.writeMsg(msg);
-				numberReceivers++;
+				numberReceivers.add(receiverConnection.getIPAddressWithPort());
 				continue;
 			}
 
 			if (senderConnection != receiverConnection) {
 				receiverConnection.writeMsg(msg);
-				numberReceivers++;
+				numberReceivers.add(receiverConnection.getIPAddressWithPort());
 			}
 		}
 
@@ -477,14 +478,15 @@ public class Control extends Thread {
 			FileOperator.saveUserName(username, secret);
 
 			// if this server is the end of the tree, then reply directly
-			Integer outNum = broadcastMessage(con, msgObj.toJSONString(), true);
-			if (outNum == 0) {
+			ArrayList<String> receiverIdentifies = broadcastMessage(con, msgObj.toJSONString(), true);
+			if (receiverIdentifies.size() == 0) {
 				msgObj.put("command", "LOCK_ALLOWED");
 				con.writeMsg(msgObj.toJSONString());
 				log.info(msgObj.toJSONString());
 			} else {
 				// add record of this lock request
-				lockItemArray.add(new LockItem((String) msgObj.get("username"), con, outNum));
+				LockItem item = new LockItem(username, secret, con, receiverIdentifies);
+				lockItemArray.add(item);
 			}
 		}
 
@@ -538,7 +540,7 @@ public class Control extends Thread {
 			// if all received, reply register success.
 			if (!curItem.isEmpty()) {
 				LockItem item = (LockItem) curItem.get(0);
-				if (item.ifNeedReplyOrginCon()) {
+				if (item.ifNeedReplyOrginCon(con)) {
 					if (!item.getOriginCon().getIsServer()) {
 						// Reply the register success message
 						registerSuccess(userName, secret, item.getOriginCon());
@@ -554,8 +556,32 @@ public class Control extends Thread {
 		return false;
 	}
 	
-	private synchronized void reduceLockItemOutNumber(Connection disconnectCon) {
-		
+	/**
+	 * check if need to reply lock allow when the connection lost
+	 * @param lockItem
+	 * @param connectCon
+	 * @param msgObj
+	 */
+	@SuppressWarnings("unchecked")
+	public synchronized void checkReplyLockAllow(Connection connectCon) {
+		for (LockItem lockItem : lockItemArray) {
+			if (lockItem.ifNeedReplyOrginCon(connectCon)) {
+				if (!lockItem.getOriginCon().getIsServer()) {
+					// Reply the register success message
+					registerSuccess(lockItem.getUserName(), lockItem.getSecret(), lockItem.getOriginCon());
+				} else {
+					// reply the origin server the lock allow msg
+					JSONObject msgObj = new JSONObject();
+					msgObj.put("command", "LOCK_ALLOWED");
+					msgObj.put("username", lockItem.getUserName());
+					msgObj.put("secret", lockItem.getSecret());
+
+					lockItem.getOriginCon().writeMsg(msgObj.toJSONString());
+				}
+
+				lockItemArray.remove(lockItem);
+			}
+		}
 	}
 
 	/*
@@ -784,6 +810,10 @@ public class Control extends Thread {
 			if (con.getIsRemoteServer()) {
 				reconnectServer();
 			}
+			
+			// when one connection lost, check if currently has lock_allow request related to the connection
+			// if has, then remove the identify of this connection, and then check if need to reply lock_allow
+			checkReplyLockAllow(con);
 		}
 	}
 

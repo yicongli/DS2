@@ -4,31 +4,41 @@
 
 package activitystreamer.server;
 
+import java.util.ArrayList;
+
 public class LockItem {
 	private String userName;
+	private String secret;
 	// if one server send lock_request originally, then this var store the client connection
 	// otherwise store the receive server connection
 	private Connection originCon; 
 	// the broadcast times
-	private Integer	   outConNumber;
+	private ArrayList<String> outConIP;
 	
-	public LockItem(String name, Connection con, Integer outNum) {
-		userName = name;
+	public LockItem(String name, String sec, Connection con, ArrayList<String> outConip) {
+		userName  = name;
+		secret    = sec;
 		originCon = con; 
-		outConNumber = outNum;
+		outConIP  = outConip;
 	}
 	
-	public String getUserName() {
-		return userName;
-	}
 	
 	public Connection getOriginCon() {
 		return originCon;
 	}
 	
 	// check if need to reply the lock response to origin connection 
-	public boolean ifNeedReplyOrginCon () {
-		outConNumber --;
-		return outConNumber == 0;
+	public boolean ifNeedReplyOrginCon (Connection receiveCon) {
+		outConIP.remove(receiveCon.getIPAddressWithPort());
+		return outConIP.size() == 0;
+	}
+
+	public String getSecret() {
+		return secret;
+	}
+
+
+	public String getUserName() {
+		return userName;
 	}
 }
