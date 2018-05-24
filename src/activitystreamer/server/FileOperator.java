@@ -29,7 +29,7 @@ public class FileOperator {
 	public static void createNewFile(File f) {
 		try {
 			f.createNewFile();
-			saveUserName("anonymous", "");
+			saveUserName("anonymous", "", new Long(0));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -63,9 +63,13 @@ public class FileOperator {
 	 * create by yicongLI 14-05-2018 save user name and password
 	 */
 	@SuppressWarnings("unchecked")
-	public static synchronized void saveUserName(String name, String password) {
+	public static synchronized void saveUserName(String name, String password, Long registerTime) {
 		JSONObject obj = allUserInfo();
-		obj.put(name, password);
+		
+		JSONObject infoObj = new JSONObject();
+		infoObj.put("password", password);
+		infoObj.put("registertime", registerTime);
+		obj.put(name, infoObj);
 		saveUserInfoToLocal(obj.toJSONString());
 	}
 

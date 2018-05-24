@@ -9,17 +9,19 @@ import java.util.ArrayList;
 public class LockItem {
 	private String userName;
 	private String secret;
+	private Long registerTime;
 	// if one server send lock_request originally, then this var store the client connection
 	// otherwise store the receive server connection
 	private Connection originCon; 
 	// the broadcast times
 	private ArrayList<String> outConIP;
 	
-	public LockItem(String name, String sec, Connection con, ArrayList<String> outConip) {
+	public LockItem(String name, String sec, Long rTime, Connection con, ArrayList<String> outConip) {
 		userName  = name;
 		secret    = sec;
 		originCon = con; 
 		outConIP  = outConip;
+		registerTime = rTime;
 	}
 	
 	
@@ -40,5 +42,9 @@ public class LockItem {
 
 	public String getUserName() {
 		return userName;
+	}
+	
+	public Long getRegisterTime () {
+		return registerTime;
 	}
 }

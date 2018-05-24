@@ -19,10 +19,10 @@ import org.apache.logging.log4j.Logger;
 
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-
 import activitystreamer.util.Settings;
 
 public class Control extends Thread {
@@ -123,6 +123,8 @@ public class Control extends Thread {
 		msgObj.put("command", "LOCK_REQUEST");
 		msgObj.put("username", username);
 		msgObj.put("secret", secret);
+		Long time = new Long(new Date().getTime());
+		msgObj.put("registertime", time);
 
 		ArrayList<String> receiverIdentifies = broadcastMessage(null, msgObj.toJSONString(), true);
 
@@ -131,10 +133,10 @@ public class Control extends Thread {
 			if (FileOperator.checkLocalStorage(username) != null) {
 				registerFail(username, clientConnection);
 			} else {
-				registerSuccess(username, secret, clientConnection);
+				registerSuccess(username, secret, time, clientConnection);
 			}
 		} else {
-			LockItem item = new LockItem(username, secret, clientConnection, receiverIdentifies);
+			LockItem item = new LockItem(username, secret, time, clientConnection, receiverIdentifies);
 			lockItemArray.add(item);
 		}
 	}
@@ -404,12 +406,12 @@ public class Control extends Thread {
 	 * Added by thaol4 register success, append new username and secret pair to
 	 * file, server replies
 	 */
-	private void registerSuccess(String username, String secret, Connection con) {
+	private void registerSuccess(String username, String secret, Long registerTime, Connection con) {
 		String cmd = "REGISTER_SUCCESS";
 		String info = "register success for " + username;
 		responseMsg(cmd, info, con);
 
-		FileOperator.saveUserName(username, secret);
+		FileOperator.saveUserName(username, secret, registerTime);
 
 		// After register successfully, login
 		String loginMsg = "{\"command\":\"LOGIN\",\"username\":\"" + username + "\",\"secret\" :\"" + secret + "\"}";
@@ -467,6 +469,7 @@ public class Control extends Thread {
 
 		String username = (String) msgObj.get("username");
 		String secret = (String) msgObj.get("secret");
+		Long  registerTime = (Long) msgObj.get("registertime");
 
 		if (FileOperator.checkLocalStorage(username) != null) {
 			// if found name in local storage, then reply the deny message
@@ -475,7 +478,7 @@ public class Control extends Thread {
 
 			log.info(msgObj.toJSONString());
 		} else {
-			FileOperator.saveUserName(username, secret);
+			FileOperator.saveUserName(username, secret, registerTime);
 
 			// if this server is the end of the tree, then reply directly
 			ArrayList<String> receiverIdentifies = broadcastMessage(con, msgObj.toJSONString(), true);
@@ -485,7 +488,7 @@ public class Control extends Thread {
 				log.info(msgObj.toJSONString());
 			} else {
 				// add record of this lock request
-				LockItem item = new LockItem(username, secret, con, receiverIdentifies);
+				LockItem item = new LockItem(username, secret, registerTime, con, receiverIdentifies);
 				lockItemArray.add(item);
 			}
 		}
@@ -512,6 +515,7 @@ public class Control extends Thread {
 
 		String userName = (String) msgObj.get("username");
 		String secret = (String) msgObj.get("secret");
+		Long registerTime = (Long) msgObj.get("registertime");
 
 		Predicate<? super LockItem> filter = s -> userName.equals(s.getUserName());
 		List<LockItem> curItem = lockItemArray.stream().filter(filter).collect(Collectors.toList());
@@ -543,7 +547,7 @@ public class Control extends Thread {
 				if (item.ifNeedReplyOrginCon(con)) {
 					if (!item.getOriginCon().getIsServer()) {
 						// Reply the register success message
-						registerSuccess(userName, secret, item.getOriginCon());
+						registerSuccess(userName, secret, registerTime, item.getOriginCon());
 					} else {
 						// reply the origin server the lock allow msg
 						item.getOriginCon().writeMsg(msgObj.toJSONString());
@@ -568,7 +572,10 @@ public class Control extends Thread {
 			if (lockItem.ifNeedReplyOrginCon(connectCon)) {
 				if (!lockItem.getOriginCon().getIsServer()) {
 					// Reply the register success message
-					registerSuccess(lockItem.getUserName(), lockItem.getSecret(), lockItem.getOriginCon());
+					registerSuccess(lockItem.getUserName(), 
+									lockItem.getSecret(), 
+									lockItem.getRegisterTime(), 
+									lockItem.getOriginCon());
 				} else {
 					// reply the origin server the lock allow msg
 					JSONObject msgObj = new JSONObject();
@@ -587,6 +594,7 @@ public class Control extends Thread {
 	/*
 	 * save synchronized userinfo into local storage
 	 */
+	@SuppressWarnings("unchecked")
 	private synchronized boolean saveUserInfo(Connection con, JSONObject msgObj) {
 		if (!con.getIsServer()) {
 			responseInvalidMsg("Message received from an unauthenticated server", con);
@@ -599,7 +607,45 @@ public class Control extends Thread {
 			return true;
 		}
 
+		JSONObject localList = FileOperator.allUserInfo();
 		String jsonString = (String) msgObj.get("userinfo");
+		JSONObject incomeList = null;
+		
+		try {
+			incomeList = (JSONObject) parser.parse(jsonString);
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+		
+		JSONObject newUserForCon = new JSONObject();
+		JSONObject newUserForLocal = new JSONObject();
+		
+		for (Object key : localList.keySet()) {
+			if (incomeList.containsKey(key)) {
+				JSONObject localInfo = (JSONObject) localList.get(key);
+				JSONObject incomeInfo = (JSONObject) incomeList.get(key);
+				if (!localInfo.get("password").equals(incomeInfo.get("password"))) {
+					if ((Long)localInfo.get("registertime") > (Long)incomeInfo.get("registertime")) {
+						newUserForLocal.put(key, incomeInfo.get(key));
+					} else {
+						newUserForCon.put(key, localInfo.get(key));
+					}
+				}
+			} else {
+				newUserForCon.put(key, localList.get(key));
+			}
+		}
+		
+		for (Object key : incomeList.keySet()) { 
+			if (!localList.containsKey(key)) {
+				newUserForLocal.put(key, incomeList.get(key));
+			}
+		}
+		
+		// TODO: save new user to local and broadcast to all the other connected server except this income one
+		// TODO: send new user to this income one, which receive server and broadcast to the others
+		// TODO: when receive new user, check local login user, kick off the user with wrong password
+		
 		FileOperator.saveUserInfoToLocal(jsonString);
 
 		// store logout user info into userManager
