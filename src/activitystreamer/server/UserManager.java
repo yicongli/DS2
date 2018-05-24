@@ -80,8 +80,10 @@ public class UserManager {
 			msgObj.put("command", "DELETE_LOGOUT_USER");
 			Gson gUserInfo = new Gson();
 			msgObj.put("userInfo", gUserInfo.toJson(oldUser));
-
-			Control.getInstance().broadcastMessage(null, msgObj.toJSONString(), true);
+			
+			String msgStr = msgObj.toJSONString();
+			Control.log.debug(msgStr);
+			Control.getInstance().broadcastMessage(null, msgStr, true);
 		}
 	}
 	
@@ -149,9 +151,12 @@ public class UserManager {
 				msgObjFinal.put("userinfo", gUserInfo.toJson(userInfo));
 				
 				// Broadcasting message to all the other servers,except anonymous
+				String broadcastStr = msgObjFinal.toJSONString();
 				if (!userInfo.isAnonymous()) {
 					Control.getInstance().broadcastMessage(null, msgObjFinal.toJSONString(), true);
 				}
+				
+				Control.log.debug("Store message:" + broadcastStr);
 			}
 		}
 	}
