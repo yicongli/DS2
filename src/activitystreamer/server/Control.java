@@ -58,7 +58,7 @@ public class Control extends Thread {
 
 		try {
 			listener = new Listener(); 	// start a listener
-			start_connection(); 		// initiate connection with remote server
+			startConnection(); 			// initiate connection with remote server
 			start(); 					// start regular operation
 		} catch (IOException e1) {
 			log.fatal("failed to startup a listening thread: " + e1);
@@ -80,19 +80,19 @@ public class Control extends Thread {
 	/*
 	 * Create a new connection when the server starts
 	 */
-	public void start_connection() {
+	public void startConnection() {
 		if (Settings.getRemoteHostname() != null) {
 			try {
-				Socket server_socket = new Socket();
+				Socket serverSocket = new Socket();
 				InetSocketAddress address = new InetSocketAddress(Settings.getRemoteHostname(),
 						Settings.getRemotePort());
 				// connection timeout is less than reconnection time
-				server_socket.connect(address, 5000);
+				serverSocket.connect(address, 5000);
 				
-				Connection new_connection = outgoingConnection(server_socket);
-				new_connection.setIsServer(true); 		// set flag of server
-				new_connection.setIsRemoteServer(true); // set if this server is the remote server
-				request_authentication(new_connection); 	// send authentication to the parent server
+				Connection newConnection = outgoingConnection(serverSocket);
+				newConnection.setIsServer(true); 		// set flag of server
+				newConnection.setIsRemoteServer(true); // set if this server is the remote server
+				requestAuthentication(newConnection); 	// send authentication to the parent server
 				resetReconnectOperation();
 			} catch (IOException e) {
 				log.error("failed to make connection to " + Settings.getRemoteHostname() + ":"
@@ -106,35 +106,35 @@ public class Control extends Thread {
 	 * @port: the listening port of current server
 	 */
 	@SuppressWarnings("unchecked")
-	private synchronized void request_authentication(Connection receiver_connection) {
+	private synchronized void requestAuthentication(Connection receiverConnection) {
 		JSONObject msgObj = new JSONObject();
 		msgObj.put("command", "AUTHENTICATE");
 		msgObj.put("secret", Settings.getServerSecret());
 		msgObj.put("port", Settings.getLocalPort());
-		receiver_connection.writeMsg(msgObj.toJSONString());
+		receiverConnection.writeMsg(msgObj.toJSONString());
 	}
 
 	/*
 	 * add by yicongLI 23-04-18 send lock request when register a new account
 	 */
 	@SuppressWarnings("unchecked")
-	private synchronized void lock_request(String username, String secret, Connection client_connection) {
+	private synchronized void lockRequest(String username, String secret, Connection clientConnection) {
 		JSONObject msgObj = new JSONObject();
 		msgObj.put("command", "LOCK_REQUEST");
 		msgObj.put("username", username);
 		msgObj.put("secret", secret);
 
-		Integer number_receivers = broadcastMessage(null, msgObj.toJSONString(), true);
+		Integer numberReceivers = broadcastMessage(null, msgObj.toJSONString(), true);
 
 		// if current server has no connected server, then check local storage directly.
-		if (number_receivers == 0) {
+		if (numberReceivers == 0) {
 			if (FileOperator.checkLocalStorage(username) != null) {
-				registerFail(username, client_connection);
+				registerFail(username, clientConnection);
 			} else {
-				registerSuccess(username, secret, client_connection);
+				registerSuccess(username, secret, clientConnection);
 			}
 		} else {
-			lockItemArray.add(new LockItem(username, client_connection, number_receivers));
+			lockItemArray.add(new LockItem(username, clientConnection, numberReceivers));
 		}
 	}
 
@@ -142,35 +142,35 @@ public class Control extends Thread {
 	 * BROADCAST ANNOUNCEMENT OR ACTIVITIES
 	 * Send the message from the sender to other receivers Receivers can be servers
 	 * and clients or only servers
-	 * @param sender_connection the connection from which receive the message, 
+	 * @param senderConnection the connection from which receive the message, 
 	 * 							if null, then broadcast to all the other connections
 	 * @param msg 				broadcast message
-	 * @param send_only_servers if ture, then just broadcast to the other servers.
+	 * @param sendOnlyServers if ture, then just broadcast to the other servers.
 	 * @return broadcast time
 	 */
-	public synchronized Integer broadcastMessage(Connection sender_connection, String msg, boolean send_only_servers) {
-		Integer number_receivers = 0;
-		for (Connection receiver_connection : connections) {
+	public synchronized Integer broadcastMessage(Connection senderConnection, String msg, boolean sendOnlyServers) {
+		Integer numberReceivers = 0;
+		for (Connection receiverConnection : connections) {
 
 			// only broadcast between servers
-			if (send_only_servers && !receiver_connection.getIsServer()) {
+			if (sendOnlyServers && !receiverConnection.getIsServer()) {
 				continue;
 			}
 
 			// broadcast to all the receivers
-			if (sender_connection == null) {
-				receiver_connection.writeMsg(msg);
-				number_receivers++;
+			if (senderConnection == null) {
+				receiverConnection.writeMsg(msg);
+				numberReceivers++;
 				continue;
 			}
 
-			if (sender_connection != receiver_connection) {
-				receiver_connection.writeMsg(msg);
-				number_receivers++;
+			if (senderConnection != receiverConnection) {
+				receiverConnection.writeMsg(msg);
+				numberReceivers++;
 			}
 		}
 
-		return number_receivers;
+		return numberReceivers;
 	}
 
 	/*
@@ -441,14 +441,14 @@ public class Control extends Thread {
 			registerFail(username, con);
 			return true;
 		} else {
-			// Send lock request by invoking lock_request function
-			lock_request(username, secret, con);
+			// Send lock request by invoking lockRequest function
+			lockRequest(username, secret, con);
 			return false;
 		}
 	}
 
 	/*
-	 * add by yicongLI 23-04-18 handling the operation when receive lock_request
+	 * add by yicongLI 23-04-18 handling the operation when receive lockRequest
 	 * modified by thaol4
 	 */
 	@SuppressWarnings("unchecked")
@@ -553,6 +553,10 @@ public class Control extends Thread {
 		}
 		return false;
 	}
+	
+	private synchronized void reduceLockItemOutNumber(Connection disconnectCon) {
+		
+	}
 
 	/*
 	 * save synchronized userinfo into local storage
@@ -643,7 +647,7 @@ public class Control extends Thread {
 	private synchronized boolean activityMessage(Connection con, String message) {
 		// check invalids
 		JSONObject msgObject = null;
-		JSONObject activity_message = null;
+		JSONObject activityMessage = null;
 		try {
 			msgObject = (JSONObject) parser.parse(message);
 			if (!msgObject.containsKey("activity")) {
@@ -660,9 +664,9 @@ public class Control extends Thread {
 			}
 
 			// parse activity
-			activity_message = (JSONObject) msgObject.get("activity");
-			if (activity_message == null) {
-				activity_message = new JSONObject();
+			activityMessage = (JSONObject) msgObject.get("activity");
+			if (activityMessage == null) {
+				activityMessage = new JSONObject();
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -676,11 +680,11 @@ public class Control extends Thread {
 
 		int latestIndex = clientInfoManager.shouldAuthenticateClient(userName, secret, con);
 		if (latestIndex != -1) {
-			activity_message.put("authenticated_user", userName);
+			activityMessage.put("authenticated_user", userName);
 
 			JSONObject msgObjFinal = new JSONObject();
 			msgObjFinal.put("command", "ACTIVITY_BROADCAST");
-			msgObjFinal.put("activity", activity_message);
+			msgObjFinal.put("activity", activityMessage);
 			// add time stamp and index
 			msgObjFinal.put("timestamp", new Long(new Date().getTime()));
 			msgObjFinal.put("index", new Integer(latestIndex));
@@ -795,7 +799,7 @@ public class Control extends Thread {
 			public void actionPerformed(ActionEvent evt) {
 				// if fail to change status, then don't reconnect the server
 				if (changeReconnectStatus()) {
-					start_connection();
+					startConnection();
 				}
 			}
 		};
@@ -1006,12 +1010,8 @@ public class Control extends Thread {
 			connectionClosed(redirectCon);
 		}
 	}
-
-	public final void setTerm(boolean t) {
+	
+	public void setTerm (boolean t) {
 		term = t;
-	}
-
-	public final ArrayList<Connection> getConnections() {
-		return connections;
 	}
 }
