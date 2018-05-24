@@ -34,7 +34,7 @@ public class Control extends Thread {
 	private static String uniqueID; // the Identification of current server
 	private static ArrayList<LockItem> lockItemArray; // the items handling the lock request
 	public static JSONParser parser; // the parser to parse the JSON data
-	public static UserManager userManager = null; // UserInfo manager
+	public static ClientInfoManager clientInfoManager = null; // UserInfo manager
 	private static int reconnectTime = 0; // Reconnect time
 	private static Timer reconnectTimer = null; // Reconnect timer
 
@@ -52,7 +52,7 @@ public class Control extends Thread {
 		connections = new ArrayList<Connection>(); // initialize the connections item array
 		announcementInfo = new ArrayList<JSONObject>(); // initialize the announcement item array
 		lockItemArray = new ArrayList<LockItem>(); // initialize the lock item array
-		userManager = new UserManager(); // manage login/logout user info
+		clientInfoManager = new ClientInfoManager(); // manage login/logout user info
 		parser = new JSONParser(); // initialize parser and remote connection
 		uniqueID = Settings.nextSecret();
 
@@ -284,7 +284,7 @@ public class Control extends Thread {
 			cmd = "LOGIN_SUCCESS";
 			info = "logged in as user " + username;
 			;
-			userManager.addNewLoginUserInfo(username, secret, con);
+			clientInfoManager.addNewLoginClientInfo(username, secret, con);
 			responseMsg(cmd, info, con);
 
 			// check if need to redirect login, if need, then close current server
@@ -383,7 +383,7 @@ public class Control extends Thread {
 
 		// synchronize logout user info
 		Gson logoutUser = new Gson();
-		String logoutInfo = logoutUser.toJson(userManager.getLogoutUserInfos());
+		String logoutInfo = logoutUser.toJson(clientInfoManager.getLogoutClientInfos());
 		msgObj.put("logoutUserInfos", logoutInfo);
 
 		outCon.writeMsg(msgObj.toJSONString());
@@ -575,10 +575,10 @@ public class Control extends Thread {
 		// store logout user info into userManager
 		jsonString = (String) msgObj.get("logoutUserInfos");
 		Gson gson = new Gson();
-		Type type = new TypeToken<ArrayList<LogoutUserInfo>>() {
+		Type type = new TypeToken<ArrayList<LogoutClientInfo>>() {
 		}.getType();
-		ArrayList<LogoutUserInfo> arrayList = gson.fromJson(jsonString, type);
-		userManager.setLogoutUserInfos(arrayList);
+		ArrayList<LogoutClientInfo> arrayList = gson.fromJson(jsonString, type);
+		clientInfoManager.setLogoutClientInfos(arrayList);
 
 		// save ParentHostName remote hostname/port
 		Settings.setParentHostNameOfRemote((String) msgObj.get("remotehostname"));
@@ -602,9 +602,9 @@ public class Control extends Thread {
 
 		String jsonString = (String) msgObj.get("userinfo");
 		Gson gson = new Gson();
-		Type type = new TypeToken<LogoutUserInfo>() {
+		Type type = new TypeToken<LogoutClientInfo>() {
 		}.getType();
-		userManager.recieveLogoutUserInfo(gson.fromJson(jsonString, type));
+		clientInfoManager.recieveLogoutClientInfo(gson.fromJson(jsonString, type));
 		return false;
 	}
 
@@ -629,9 +629,9 @@ public class Control extends Thread {
 
 		String jsonString = (String) msgObj.get("userinfo");
 		Gson gson = new Gson();
-		Type type = new TypeToken<LogoutUserInfo>() {
+		Type type = new TypeToken<LogoutClientInfo>() {
 		}.getType();
-		userManager.getLogoutUserInfos().remove(gson.fromJson(jsonString, type));
+		clientInfoManager.getLogoutClientInfos().remove(gson.fromJson(jsonString, type));
 
 		broadcastMessage(con, msgObj.toJSONString(), true);
 
@@ -676,7 +676,7 @@ public class Control extends Thread {
 		String userName = (String) msgObject.get("username");
 		String secret = (String) msgObject.get("secret");
 
-		int latestIndex = userManager.shouldAuthenticateUser(userName, secret, con);
+		int latestIndex = clientInfoManager.shouldAuthenticateClient(userName, secret, con);
 		if (latestIndex != -1) {
 			activity_message.put("authenticated_user", userName);
 
@@ -717,10 +717,10 @@ public class Control extends Thread {
 		// check if need to save the activity for logout user info
 		ArrayList<String> messageArray = new ArrayList<String>();
 		messageArray.add(message);
-		userManager.checkIfStoreMessagesForLogoutUser(messageArray);
+		clientInfoManager.checkIfStoreMessagesForLogoutClient(messageArray);
 
 		// broadcast here
-		boolean sentToClient = userManager.checkIfBroadcastToClients(msgObject, con);
+		boolean sentToClient = clientInfoManager.checkIfBroadcastToClients(msgObject, con);
 		broadcastMessage(con, msgObject.toJSONString(), sentToClient);
 		return false;
 	}

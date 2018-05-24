@@ -9,39 +9,39 @@ import org.json.simple.parser.ParseException;
 
 import com.google.gson.Gson;
 
-public class UserManager {
+public class ClientInfoManager {
 	
-	private ArrayList<LogoutUserInfo> logoutUserInfos = null;
-	private ArrayList<LoginUserInfo> loginUserInfos = null;
-	private ArrayList<IncomeActicityUserInfo> incomeActicityInfos = null;
+	private ArrayList<LogoutClientInfo> logoutClientInfos = null;
+	private ArrayList<LoginClientInfo> loginClientnfos = null;
+	private ArrayList<IncomeActicityClientInfo> incomeActicityInfos = null;
 	
-	public UserManager() {
-		setLogoutUserInfos(new ArrayList<LogoutUserInfo>());
-		setLoginUserInfos(new ArrayList<LoginUserInfo>());
-		setIncomeActicityInfos(new ArrayList<IncomeActicityUserInfo>());
+	public ClientInfoManager() {
+		setLogoutClientInfos(new ArrayList<LogoutClientInfo>());
+		setLoginClientInfos(new ArrayList<LoginClientInfo>());
+		setIncomeActicityInfos(new ArrayList<IncomeActicityClientInfo>());
 	}
 	
-	public synchronized ArrayList<LoginUserInfo> getLoginUserInfos() {
-		return loginUserInfos;
+	public synchronized ArrayList<LoginClientInfo> getLoginClientInfos() {
+		return loginClientnfos;
 	}
 
-	public synchronized void setLoginUserInfos(ArrayList<LoginUserInfo> loginUserInfos) {
-		this.loginUserInfos = loginUserInfos;
+	public synchronized void setLoginClientInfos(ArrayList<LoginClientInfo> loginUserInfos) {
+		this.loginClientnfos = loginUserInfos;
 	}
 
-	public synchronized ArrayList<LogoutUserInfo> getLogoutUserInfos() {
-		return logoutUserInfos;
+	public synchronized ArrayList<LogoutClientInfo> getLogoutClientInfos() {
+		return logoutClientInfos;
 	}
 
-	public synchronized void setLogoutUserInfos(ArrayList<LogoutUserInfo> logoutUserInfos) {
-		this.logoutUserInfos = logoutUserInfos;
+	public synchronized void setLogoutClientInfos(ArrayList<LogoutClientInfo> logoutUserInfos) {
+		this.logoutClientInfos = logoutUserInfos;
 	}
 	
-	public ArrayList<IncomeActicityUserInfo> getIncomeActicityInfos() {
+	public ArrayList<IncomeActicityClientInfo> getIncomeActicityInfos() {
 		return incomeActicityInfos;
 	}
 
-	public void setIncomeActicityInfos(ArrayList<IncomeActicityUserInfo> incomeMessageInfos) {
+	public void setIncomeActicityInfos(ArrayList<IncomeActicityClientInfo> incomeMessageInfos) {
 		this.incomeActicityInfos = incomeMessageInfos;
 	}
 	
@@ -52,22 +52,22 @@ public class UserManager {
 	 * @param con		current user's con
 	 */
 	@SuppressWarnings("unchecked")
-	public synchronized void addNewLoginUserInfo(String username, String secret, Connection con) {
-		LoginUserInfo newUser = new LoginUserInfo(username, secret, con);
-		getLoginUserInfos().add(newUser);
+	public synchronized void addNewLoginClientInfo(String username, String secret, Connection con) {
+		LoginClientInfo newUser = new LoginClientInfo(username, secret, con);
+		getLoginClientInfos().add(newUser);
 		
 		// check if local has stored logout user information
-		LogoutUserInfo oldUser = null;
-		for (LogoutUserInfo userInfo : getLogoutUserInfos()) {
-			if (userInfo.equals((UserInfo)newUser)) {
-				oldUser = userInfo;
+		LogoutClientInfo oldClient = null;
+		for (LogoutClientInfo userInfo : getLogoutClientInfos()) {
+			if (userInfo.equals((ClientInfo)newUser)) {
+				oldClient = userInfo;
 			}
 		}
 		 
 		// if has remove the user from user info and sent stored user activities to this client
-		if (oldUser != null) {
-			getLogoutUserInfos().remove(oldUser);
-			for (String message : oldUser.getMessageArray()) {
+		if (oldClient != null) {
+			getLogoutClientInfos().remove(oldClient);
+			for (String message : oldClient.getMessageArray()) {
 				con.writeMsg(message);
 			}
 			
@@ -75,7 +75,7 @@ public class UserManager {
 			JSONObject msgObj = new JSONObject();
 			msgObj.put("command", "DELETE_LOGOUT_USER");
 			Gson gUserInfo = new Gson();
-			msgObj.put("userInfo", gUserInfo.toJson(oldUser));
+			msgObj.put("userInfo", gUserInfo.toJson(oldClient));
 			
 			String msgStr = msgObj.toJSONString();
 			Control.log.debug(msgStr);
@@ -90,13 +90,13 @@ public class UserManager {
 	 * @param con	   the connection object
 	 * @return -1: shouldn't authenticate user; other number: latest message index of current user
 	 */
-	public synchronized int shouldAuthenticateUser (String username, String secret, Connection con) {
+	public synchronized int shouldAuthenticateClient (String username, String secret, Connection con) {
 		int latestIndex = -1;
-		for (LoginUserInfo userInfo : getLoginUserInfos()) {
-			if (userInfo.getUsername().equals(username) 
-					&& userInfo.getSecret().equals(secret)
-						&& userInfo.getConnection().equals(con)) {
-				latestIndex = userInfo.increaseIndex();
+		for (LoginClientInfo clientInfo : getLoginClientInfos()) {
+			if (clientInfo.getUsername().equals(username) 
+					&& clientInfo.getSecret().equals(secret)
+						&& clientInfo.getConnection().equals(con)) {
+				latestIndex = clientInfo.increaseIndex();
 			}
 		}
 		
@@ -106,28 +106,31 @@ public class UserManager {
 	/*
 	 * remove login user when connection lost or receive logout message
 	 */
-	public synchronized boolean removeLoginUserInfo (Connection con) {
+	public synchronized boolean removeLoginClientInfo (Connection con) {
 		if (con.getIsServer()) {
 			return false;
 		}
 		
-		LoginUserInfo curUserInfo = null;
-		for (LoginUserInfo userInfo : getLoginUserInfos()) {
-			if (userInfo.getConnection().equals(con)) {
-				curUserInfo = userInfo;
-				logoutUserInfos.add(new LogoutUserInfo(userInfo.getUsername(), userInfo.getSecret(), userInfo.getIpAddress()));
+		LoginClientInfo curClientInfo = null;
+		for (LoginClientInfo clientInfo : getLoginClientInfos()) {
+			if (clientInfo.getConnection().equals(con)) {
+				curClientInfo = clientInfo;
+				LogoutClientInfo info = new LogoutClientInfo(clientInfo.getUsername(), 
+																clientInfo.getSecret(), 
+																clientInfo.getIpAddress());
+				logoutClientInfos.add(info);
 			}
 		}
 		
-		if (curUserInfo != null) {
-			getLoginUserInfos().remove(curUserInfo);
+		if (curClientInfo != null) {
+			getLoginClientInfos().remove(curClientInfo);
 		}
 		
-		return curUserInfo != null;
+		return curClientInfo != null;
 	}
 	
 	/*
-	 * check if need to store message for the log out user 
+	 * check if need to store message for the log out client 
 	 * Description: 
 	 * after the client log out, the client could log in to any server in the system again
 	 * so every server should store the log out user info, 
@@ -135,7 +138,7 @@ public class UserManager {
 	 * delete the message cache
 	 */
 	@SuppressWarnings("unchecked")
-	public void checkIfStoreMessagesForLogoutUser (ArrayList<String> jsonStrArray) {
+	public void checkIfStoreMessagesForLogoutClient (ArrayList<String> jsonStrArray) {
 		for (String jsonStr : jsonStrArray) {
 			// check invalids
 			JSONObject msgObject = null;
@@ -148,24 +151,24 @@ public class UserManager {
 			
 			long time = ((Long) msgObject.get("timestamp")).longValue();
 			
-			for (LogoutUserInfo userInfo : getLogoutUserInfos()) {
+			for (LogoutClientInfo clientInfo : getLogoutClientInfos()) {
 				
-				if (userInfo.getLastLogoutTime() < time) {
-					userInfo.getMessageArray().add(jsonStr);
+				if (clientInfo.getLastLogoutTime() < time) {
+					clientInfo.getMessageArray().add(jsonStr);
 				}
 			}
 		}
 		
-		for (LogoutUserInfo userInfo : getLogoutUserInfos()) {
-			if (userInfo.isNeedToSynchronize()) {
+		for (LogoutClientInfo clientInfo : getLogoutClientInfos()) {
+			if (clientInfo.isNeedToSynchronize()) {
 				JSONObject msgObjFinal = new JSONObject();
 				msgObjFinal.put("command", "LOGOUT_USER_MESSAGE");
-				Gson gUserInfo = new Gson();
-				msgObjFinal.put("userinfo", gUserInfo.toJson(userInfo));
+				Gson gClientInfo = new Gson();
+				msgObjFinal.put("userinfo", gClientInfo.toJson(clientInfo));
 				
 				// Broadcasting message to all the other servers,except anonymous
 				String broadcastStr = msgObjFinal.toJSONString();
-				if (!userInfo.isAnonymous()) {
+				if (!clientInfo.isAnonymous()) {
 					Control.getInstance().broadcastMessage(null, msgObjFinal.toJSONString(), true);
 				}
 				
@@ -179,29 +182,29 @@ public class UserManager {
 	 *  Has: then add message to local storage and sort the message by time stamp
 	 *  Hasn't: add user to the local storage directly
 	 */
-	public synchronized void recieveLogoutUserInfo(LogoutUserInfo userInfo) {
-		Boolean hasSameLogoutUser = false;
-		for (LogoutUserInfo logoutUserInfo : getLogoutUserInfos()) {
-			if (logoutUserInfo.equals(userInfo)) {
-				hasSameLogoutUser = true;
+	public synchronized void recieveLogoutClientInfo(LogoutClientInfo clientInfo) {
+		Boolean hasSameLogoutClient = false;
+		for (LogoutClientInfo logoutClientInfo : getLogoutClientInfos()) {
+			if (logoutClientInfo.equals(clientInfo)) {
+				hasSameLogoutClient = true;
 				// add all coming message into array
-				logoutUserInfo.getMessageArray().addAll(userInfo.getMessageArray());
+				logoutClientInfo.getMessageArray().addAll(clientInfo.getMessageArray());
 				// remove redundant data
 				Set<String> set = new HashSet<String>();
-				set.addAll(logoutUserInfo.getMessageArray());
+				set.addAll(logoutClientInfo.getMessageArray());
 				
 				ArrayList<String> newMessageArray = new ArrayList<String>(set);
-				logoutUserInfo.setMessageArray(newMessageArray);
+				logoutClientInfo.setMessageArray(newMessageArray);
 				
 				// sort with time stamp
-				sortActivityMessageArray(logoutUserInfo.getMessageArray());
+				sortActivityMessageArray(logoutClientInfo.getMessageArray());
 			}
 		}
 		
 		// if don't have same logout user, then save the user info directly
-		if (!hasSameLogoutUser) {
-			userInfo.setLogoutFromCurrentServer(false);
-			getLogoutUserInfos().add(userInfo);
+		if (!hasSameLogoutClient) {
+			clientInfo.setLogoutFromCurrentServer(false);
+			getLogoutClientInfos().add(clientInfo);
 		}
 	}
 	
@@ -236,30 +239,30 @@ public class UserManager {
 	 * @return true: broadcast to all client; false: prevent broadcast to clients
 	 */
 	public boolean checkIfBroadcastToClients(JSONObject msgObject, Connection sender_connection) {
-		IncomeActicityUserInfo userInfo = null;
+		IncomeActicityClientInfo clientInfo = null;
 		JSONObject actobj = (JSONObject) msgObject.get("activity");
 		String name = (String) actobj.get("authenticated_user");
 		String ip   = (String) msgObject.get("ip");
-		for (IncomeActicityUserInfo incomeActicityUserInfo : incomeActicityInfos) {
-			if (incomeActicityUserInfo.isCurrentInfo(name, ip)) {
-				userInfo = incomeActicityUserInfo;
+		for (IncomeActicityClientInfo incomeActicityClientInfo : incomeActicityInfos) {
+			if (incomeActicityClientInfo.isCurrentInfo(name, ip)) {
+				clientInfo = incomeActicityClientInfo;
 			}
 		}
 		
 		// if did not find the user info, then create a new one
-		boolean newUserInfo = userInfo == null;
-		if (userInfo == null) {
-			userInfo = new IncomeActicityUserInfo(name, sender_connection);
-			incomeActicityInfos.add(userInfo);
+		boolean createNewClientInfo = clientInfo == null;
+		if (clientInfo == null) {
+			clientInfo = new IncomeActicityClientInfo(name, sender_connection);
+			incomeActicityInfos.add(clientInfo);
 		}
 		
 		int curIndex = ((Integer) msgObject.get("index")).intValue();
-		int latestIndex = userInfo.getLatestIndex();
+		int latestIndex = clientInfo.getLatestIndex();
 		
 		// if current activity the next one of the recorded latest activity, 
 		// or didn't have this user info before, then broadcast directly
-		if (curIndex == latestIndex + 1 || newUserInfo) {
-			userInfo.setLatestIndex(curIndex);
+		if (curIndex == latestIndex + 1 || createNewClientInfo) {
+			clientInfo.setLatestIndex(curIndex);
 			return true;
 		}
 		
@@ -267,31 +270,31 @@ public class UserManager {
 		// which may cause that the latestIndex initialised with a message which is not the latest one
 		if (curIndex < latestIndex) {
 			// if current index less than latestIndex, means currently missing message
-			userInfo.getMessageArray().add(msgObject.toJSONString());
+			clientInfo.getMessageArray().add(msgObject.toJSONString());
 			// 
-			userInfo.setFirstIndex(Math.min(curIndex, userInfo.getFirstIndex()));
-			sortActivityMessageArray(userInfo.getMessageArray());
+			clientInfo.setFirstIndex(Math.min(curIndex, clientInfo.getFirstIndex()));
+			sortActivityMessageArray(clientInfo.getMessageArray());
 			
 			// when get all user info, broaddcast to the connected client
 			// TODO handle the situation that 
-			if (userInfo.getLatestIndex() - userInfo.getFirstIndex() == userInfo.getMessageArray().size() - 1) {
-				for (String activityMsg : userInfo.getMessageArray()) {
+			if (clientInfo.getLatestIndex() - clientInfo.getFirstIndex() == clientInfo.getMessageArray().size() - 1) {
+				for (String activityMsg : clientInfo.getMessageArray()) {
 					broadcastMessageToClient(activityMsg);
 				}
 				
 				// if any the client has logout during this process, server should store the message for them
 				// and send these message when the client re-login
-				checkIfStoreMessagesForLogoutUser(userInfo.getMessageArray());
-				userInfo.resetInfo();
+				checkIfStoreMessagesForLogoutClient(clientInfo.getMessageArray());
+				clientInfo.resetInfo();
 			}
 			
 		} else if (curIndex == latestIndex) {
 			// if the index is similar to the latest index, then ignore the message
 		} else if (curIndex > latestIndex + 1) {
 			// if the index is larger than the latest index+1, then store the message and wait for missing message
-			userInfo.getMessageArray().add(msgObject.toJSONString());
-			userInfo.setLatestIndex(curIndex);
-			userInfo.setFirstIndex(latestIndex);
+			clientInfo.getMessageArray().add(msgObject.toJSONString());
+			clientInfo.setLatestIndex(curIndex);
+			clientInfo.setFirstIndex(latestIndex);
 		} 
 		
 		return false;

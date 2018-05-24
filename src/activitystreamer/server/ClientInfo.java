@@ -6,14 +6,14 @@ import java.util.Date;
 /*
  * Anonymous identify with ip (username is "") and normal user identify with username 
  */
-public class UserInfo {
+public class ClientInfo {
 	
 	private ArrayList<String> messageArray = null;
 	private String username = "";
 	private String secret = "";
 	private String ipAddress = "";
 	
-	public UserInfo(String name, String sec, String ip) {
+	public ClientInfo(String name, String sec, String ip) {
 		setUsername(name);
 		setIpAddress(ip);
 		setSecret(sec);
@@ -58,11 +58,11 @@ public class UserInfo {
 	 */
 	@Override
 	public boolean equals (Object usr) {
-		if (!usr.getClass().equals(UserInfo.class)) {
+		if (!usr.getClass().equals(ClientInfo.class)) {
 			return false;
 		}
 		
-		UserInfo user = (UserInfo) usr;
+		ClientInfo user = (ClientInfo) usr;
 		if (user.isAnonymous()) {
 			return user.getIpAddress().equals(ipAddress);
 		}
@@ -97,13 +97,13 @@ public class UserInfo {
 /*
  * logout user Info 
  */
-class LogoutUserInfo extends UserInfo {
+class LogoutClientInfo extends ClientInfo {
 
 	private long lastLogoutTime = 0;
 	private boolean logoutFromCurrentServer = true;
 	private boolean needToSynchronize = false;
 	
-	public LogoutUserInfo(String name, String sec, String ip) {
+	public LogoutClientInfo(String name, String sec, String ip) {
 		super(name, sec, ip);
 		setLastLogoutTime(new Date().getTime());
 	}
@@ -136,11 +136,11 @@ class LogoutUserInfo extends UserInfo {
 /*
  * login user Info 
  */
-class LoginUserInfo extends UserInfo {
+class LoginClientInfo extends ClientInfo {
 	private Connection connection = null;
 	private int latestIndex = 0;
 	
-	public LoginUserInfo(String name, String sec, Connection con) {
+	public LoginClientInfo(String name, String sec, Connection con) {
 		super(name, sec, con.getIPAddressWithPort());
 		connection = con;
 	}
@@ -171,11 +171,11 @@ class LoginUserInfo extends UserInfo {
  * @author yicongli
  *
  */
-class IncomeActicityUserInfo extends UserInfo {
+class IncomeActicityClientInfo extends ClientInfo {
 	private int latestIndex = -1;
 	private int firstIndex = 1000;
 	
-	public IncomeActicityUserInfo(String name, Connection con) {
+	public IncomeActicityClientInfo(String name, Connection con) {
 		super(name, "", con.getIPAddressWithPort());
 	}
 

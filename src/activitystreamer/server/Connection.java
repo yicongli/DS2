@@ -76,7 +76,7 @@ public class Connection extends Thread {
 			}
 			
 			// remove login user info when log out
-			Control.userManager.removeLoginUserInfo(this); 
+			Control.clientInfoManager.removeLoginClientInfo(this); 
 			
 			log.debug("connection closed to "+ getIPAddressWithPort());
 			Control.getInstance().connectionClosed(this);
