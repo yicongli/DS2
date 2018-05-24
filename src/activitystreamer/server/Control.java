@@ -108,23 +108,23 @@ public class Control extends Thread {
 	 * add by yicongLI 23-04-18 send lock request when register a new account
 	 */
 	@SuppressWarnings("unchecked")
-	private synchronized void lockRequest(String userName, String secret, Connection clientCon) {
+	private synchronized void lockRequest(String username, String secret, Connection client_connection) {
 		JSONObject msgObj = new JSONObject();
 		msgObj.put("command", "LOCK_REQUEST");
-		msgObj.put("username", userName);
+		msgObj.put("username", username);
 		msgObj.put("secret", secret);
 
-		Integer outNum = broadcastMessage(null, msgObj.toJSONString(), true);
+		Integer number_receivers = broadcastMessage(null, msgObj.toJSONString(), true);
 
 		// if current server has no connected server, then check local storage directly.
-		if (outNum == 0) {
-			if (FileOperator.checkLocalStorage(userName) != null) {
-				registerFail(userName, clientCon);
+		if (number_receivers == 0) {
+			if (FileOperator.checkLocalStorage(username) != null) {
+				registerFail(username, client_connection);
 			} else {
-				registerSuccess(userName, secret, clientCon);
+				registerSuccess(username, secret, client_connection);
 			}
 		} else {
-			lockItemArray.add(new LockItem(userName, clientCon, outNum));
+			lockItemArray.add(new LockItem(username, client_connection, number_receivers));
 		}
 	}
 
