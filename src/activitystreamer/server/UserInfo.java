@@ -51,6 +51,32 @@ public class UserInfo {
 	public void setMessageArray(ArrayList<String> messageArray) {
 		this.messageArray = messageArray;
 	}
+	
+	/*
+	 * if username is anonymous, then check if ip address is similar
+	 * else check if username is similar
+	 */
+	@Override
+	public boolean equals (Object usr) {
+		if (!usr.getClass().equals(UserInfo.class)) {
+			return false;
+		}
+		
+		UserInfo user = (UserInfo) usr;
+		if (user.isAnonymous()) {
+			return user.getIpAddress().equals(ipAddress);
+		}
+		else {
+			return user.getUsername().equals(username);
+		}
+	}
+	
+	/*
+	 * check if user is anonymous
+	 */
+	public boolean isAnonymous() {
+		return username.equals("anonymous");
+	}
 }
 
 /*
@@ -58,18 +84,18 @@ public class UserInfo {
  */
 class LogoutUserInfo extends UserInfo {
 
-	private Date lastLogoutTime = null;
+	private long lastLogoutTime = 0;
 	
 	public LogoutUserInfo(String name, String sec, String ip) {
 		super(name, sec, ip);
-		setLastLogoutTime(new Date());
+		setLastLogoutTime(new Date().getTime());
 	}
 	
-	public Date getLastLogoutTime() {
+	public long getLastLogoutTime() {
 		return lastLogoutTime;
 	}
 	
-	public void setLastLogoutTime(Date lastLogoutTime) {
+	public void setLastLogoutTime(long lastLogoutTime) {
 		this.lastLogoutTime = lastLogoutTime;
 	}
 }
