@@ -472,7 +472,16 @@ public class Control extends Thread {
 		String secret = (String) msgObj.get("secret");
 		Long  registerTime = (Long) msgObj.get("registertime");
 		
-		if (FileOperator.checkLocalStorage(username) != null) {
+		JSONObject userInfo = FileOperator.checkLocalStorage(username);
+		Long localRegisterTime = new Long(0);
+		if (userInfo != null) {
+			localRegisterTime = (Long)userInfo.get("registertime");
+		}
+		
+		// if has user info in local storage, and the registertime in local is earlier, then reply lock_denied
+		// otherwise, if has user info in local storage, but the registertime in local is later, then override the local info
+		// if has no user info in local storage, then save the info directly
+		if (userInfo != null && localRegisterTime < registerTime) {
 			// if found name in local storage, then reply the deny message
 			msgObj.put("command", "LOCK_DENIED");
 			con.writeMsg(msgObj.toJSONString());
@@ -493,9 +502,6 @@ public class Control extends Thread {
 				lockItemArray.add(item);
 			}
 		}
-		
-		// TODO: handle the situation that two client register at the same time
-		
 		
 		return false;
 	}
