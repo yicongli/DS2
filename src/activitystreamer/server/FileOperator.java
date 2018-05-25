@@ -64,7 +64,12 @@ public class FileOperator {
 	 */
 	@SuppressWarnings("unchecked")
 	public static synchronized void saveUserName(String name, String password, Long registerTime) {
-		JSONObject obj = allUserInfo();
+		JSONObject obj = null;
+		if (name.equals("anonymous")) {
+			obj = new JSONObject();
+		} else {
+			obj = allUserInfo();
+		}
 		
 		JSONObject infoObj = new JSONObject();
 		infoObj.put("password", password);
