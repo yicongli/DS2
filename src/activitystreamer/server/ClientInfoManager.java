@@ -269,7 +269,7 @@ public class ClientInfoManager {
 			incomeActicityInfos.add(clientInfo);
 		}
 		
-		int curIndex = ((Integer) msgObject.get("index")).intValue();
+		int curIndex = ((Long) msgObject.get("index")).intValue();
 		int latestIndex = clientInfo.getLatestIndex();
 		
 		// if current activity the next one of the recorded latest activity, 

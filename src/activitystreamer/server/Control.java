@@ -344,6 +344,10 @@ public class Control extends Thread {
 		JSONObject target = null;
 
 		for (JSONObject jsonAvailabilityObj : announcementInfo) {
+			if (jsonAvailabilityObj.containsKey("logout")) {
+				continue;
+			}
+			
 			Long newLoad = (Long) jsonAvailabilityObj.get("load");
 			if (newLoad < currentLoad - 1) {
 				// get lowest load server
@@ -908,16 +912,14 @@ public class Control extends Thread {
 	 * remove the announcement when one connection broken
 	 * @param brokenCon the broken connection
 	 */
-	private synchronized void removeAnnouncement(Connection brokenCon) {
-		ArrayList<JSONObject> removeArr = new ArrayList<JSONObject>();
+	@SuppressWarnings("unchecked")
+	private synchronized void setAnnouncementAsLogoutStatus(Connection brokenCon) {
 		for (JSONObject jsonObject : announcementInfo) {
 			if (jsonObject.get("hostname").equals(brokenCon.getIPAddress())
 					&& ((Long)jsonObject.get("port")).longValue() == brokenCon.getRemoteListenerPort().longValue()) {
-				removeArr.add(jsonObject);
+				jsonObject.put("logout", "true");
 			}
 		}
-		
-		announcementInfo.removeAll(removeArr);
 	}
 
 	/*
@@ -933,7 +935,7 @@ public class Control extends Thread {
 				reconnectServer();
 			}
 			
-			removeAnnouncement(con); // remove the relevant announcement after connection broken
+			setAnnouncementAsLogoutStatus(con); // remove the relevant announcement after connection broken
 			
 			// when one connection lost, check if currently has lock_allow request related to the connection
 			// if has, then remove the identify of this connection, and then check if need to reply lock_allow
