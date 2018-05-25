@@ -95,16 +95,15 @@ public class FileOperator {
 
 	// Added by thaol4
 	// check if local storage contains username
-	public static synchronized String checkLocalStorage(String username) {
+	public static synchronized JSONObject checkLocalStorage(String username) {
 		File f = new File(FileOperator.fileName);
 		if (!f.exists()) {
 			createNewFile(f);
-			return username.equalsIgnoreCase("anonymous") ? "" : null;
 		}
 		JSONObject userlist = allUserInfo();
 		// username is found
 		if (userlist.containsKey(username)) {
-			return (String) userlist.get(username);
+			return (JSONObject) userlist.get(username);
 		}
 		// username is not found
 		return null;

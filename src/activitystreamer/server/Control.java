@@ -284,8 +284,8 @@ public class Control extends Thread {
 		}
 
 		// Search for the username
-		String localsecret = FileOperator.checkLocalStorage(username);
-		if (localsecret != null && localsecret.equals(secret)) {
+		JSONObject localsecret = FileOperator.checkLocalStorage(username);
+		if (localsecret != null && localsecret.get("password").equals(secret)) {
 			cmd = "LOGIN_SUCCESS";
 			info = "logged in as user " + username;
 			// store the login client information
@@ -471,7 +471,7 @@ public class Control extends Thread {
 		String username = (String) msgObj.get("username");
 		String secret = (String) msgObj.get("secret");
 		Long  registerTime = (Long) msgObj.get("registertime");
-
+		
 		if (FileOperator.checkLocalStorage(username) != null) {
 			// if found name in local storage, then reply the deny message
 			msgObj.put("command", "LOCK_DENIED");
@@ -495,7 +495,8 @@ public class Control extends Thread {
 		}
 		
 		// TODO: handle the situation that two client register at the same time
-
+		
+		
 		return false;
 	}
 
@@ -609,7 +610,8 @@ public class Control extends Thread {
 			return true;
 		}
 
-		// when receive registered user info from incomeCon, synchronise the user info between local and incomeCon
+		// when receive registered user info from incomeCon, 
+		//  synchronise the user info between local and incomeCon
 		String jsonString = (String) msgObj.get("userinfo");
 		FileOperator.synchroniseNewUserInfo(jsonString, incomeCon);
 		
