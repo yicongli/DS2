@@ -19,7 +19,6 @@ import org.apache.logging.log4j.Logger;
 
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -233,6 +232,8 @@ public class Control extends Thread {
 			return saveLogoutUserInfo(con, msgObject);
 		case "DELETE_LOGOUT_USER":
 			return deleteLogoutUserInfo(con, msgObject);
+		case "NEW_REGISTERED_USER":
+			return receiveNewRegisterUserInfo(con, msgObject);
 		default:
 			responseInvalidMsg("command is not exist", con);
 			return true;
@@ -492,6 +493,8 @@ public class Control extends Thread {
 				lockItemArray.add(item);
 			}
 		}
+		
+		// TODO: handle the situation that two client register at the same time
 
 		return false;
 	}
@@ -594,59 +597,22 @@ public class Control extends Thread {
 	/*
 	 * save synchronized userinfo into local storage
 	 */
-	@SuppressWarnings("unchecked")
-	private synchronized boolean saveUserInfo(Connection con, JSONObject msgObj) {
-		if (!con.getIsServer()) {
-			responseInvalidMsg("Message received from an unauthenticated server", con);
+	private synchronized boolean saveUserInfo(Connection incomeCon, JSONObject msgObj) {
+		if (!incomeCon.getIsServer()) {
+			responseInvalidMsg("Message received from an unauthenticated server", incomeCon);
 			return true;
 		} else if (!msgObj.containsKey("userinfo")) {
-			responseInvalidMsg("Message does not contain the userinfo field", con);
+			responseInvalidMsg("Message does not contain the userinfo field", incomeCon);
 			return true;
 		} else if (!msgObj.containsKey("logoutUserInfos")) {
-			responseInvalidMsg("Message does not contain the logoutUserInfos field", con);
+			responseInvalidMsg("Message does not contain the logoutUserInfos field", incomeCon);
 			return true;
 		}
 
-		JSONObject localList = FileOperator.allUserInfo();
+		// when receive registered user info from incomeCon, synchronise the user info between local and incomeCon
 		String jsonString = (String) msgObj.get("userinfo");
-		JSONObject incomeList = null;
+		FileOperator.synchroniseNewUserInfo(jsonString, incomeCon);
 		
-		try {
-			incomeList = (JSONObject) parser.parse(jsonString);
-		} catch (ParseException e) {
-			e.printStackTrace();
-		}
-		
-		JSONObject newUserForCon = new JSONObject();
-		JSONObject newUserForLocal = new JSONObject();
-		
-		for (Object key : localList.keySet()) {
-			if (incomeList.containsKey(key)) {
-				JSONObject localInfo = (JSONObject) localList.get(key);
-				JSONObject incomeInfo = (JSONObject) incomeList.get(key);
-				if (!localInfo.get("password").equals(incomeInfo.get("password"))) {
-					if ((Long)localInfo.get("registertime") > (Long)incomeInfo.get("registertime")) {
-						newUserForLocal.put(key, incomeInfo.get(key));
-					} else {
-						newUserForCon.put(key, localInfo.get(key));
-					}
-				}
-			} else {
-				newUserForCon.put(key, localList.get(key));
-			}
-		}
-		
-		for (Object key : incomeList.keySet()) { 
-			if (!localList.containsKey(key)) {
-				newUserForLocal.put(key, incomeList.get(key));
-			}
-		}
-		
-		// TODO: save new user to local and broadcast to all the other connected server except this income one
-		// TODO: send new user to this income one, which receive server and broadcast to the others
-		// TODO: when receive new user, check local login user, kick off the user with wrong password
-		
-		FileOperator.saveUserInfoToLocal(jsonString);
 
 		// store logout user info into userManager
 		jsonString = (String) msgObj.get("logoutUserInfos");
@@ -709,6 +675,31 @@ public class Control extends Thread {
 		// broadcast message to the other servers
 		broadcastMessage(con, msgObj.toJSONString(), true);
 
+		return false;
+	}
+	
+	/**
+	 * After receiving new register user info: broadcast to the other servers, 
+	 * check if need to logout client and then save to local storage
+	 * @param incomeCon
+	 * @param msgObj
+	 * @return if break connection
+	 */
+	private synchronized boolean receiveNewRegisterUserInfo(Connection incomeCon, JSONObject msgObj) {
+		if (!incomeCon.getIsServer()) {
+			responseInvalidMsg("Message received from an unauthenticated server", incomeCon);
+			return true;
+		} else if (!msgObj.containsKey("userinfo")) {
+			responseInvalidMsg("Message does not contain the userinfo field", incomeCon);
+			return true;
+		}
+		
+		//newJsonUserInfoForLocal.put("userinfo", newUserForLocal);
+		JSONObject newUser = (JSONObject)msgObj.get("userinfo");
+		broadcastMessage(incomeCon, msgObj.toJSONString(), true);
+		clientInfoManager.checkLoggingoutClients(newUser);
+		FileOperator.saveNewUserInfo(newUser);
+		
 		return false;
 	}
 

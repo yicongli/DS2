@@ -120,4 +120,86 @@ public class FileOperator {
 			e.printStackTrace();
 		}
 	}
+	
+	/**
+	 * synchronize the user info between local and remote server
+	 * @param incomeUserInfoStr the user info json str from remote server
+	 * @param incomeCon			the connection with remote server
+	 */
+	@SuppressWarnings("unchecked")
+	public static synchronized void synchroniseNewUserInfo (String incomeUserInfoStr, Connection incomeCon) {
+		JSONObject incomeList = null;
+		JSONObject localList = FileOperator.allUserInfo();
+		
+		try {
+			incomeList = (JSONObject) Control.parser.parse(incomeUserInfoStr);
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+		
+		// filter the new user information from the other server
+		JSONObject newUserForCon = new JSONObject();
+		JSONObject newUserForLocal = new JSONObject();
+		
+		for (Object key : localList.keySet()) {
+			if (incomeList.containsKey(key)) {
+				JSONObject localInfo = (JSONObject) localList.get(key);
+				JSONObject incomeInfo = (JSONObject) incomeList.get(key);
+				// if two userInfo data has same username with different password
+				// then check which one has latest register time
+				if (!localInfo.get("password").equals(incomeInfo.get("password"))) {
+					// if local info register later, then override the local user information
+					if ((Long)localInfo.get("registertime") > (Long)incomeInfo.get("registertime")) {
+						newUserForLocal.put(key, incomeInfo.get(key));
+					// otherwise override the remote userinfo
+					} else {
+						newUserForCon.put(key, localInfo.get(key));
+					}
+				}
+			// if there are unknown userinfo in local, then add them to remote userinfo
+			} else {
+				newUserForCon.put(key, localList.get(key));
+			}
+		}
+		
+		// if there are unknown userinfo in local, then add them to remote userinfo
+		for (Object key : incomeList.keySet()) { 
+			if (!localList.containsKey(key)) {
+				newUserForLocal.put(key, incomeList.get(key));
+			}
+		}
+		
+		// send new user to this income connection, which will check local storage and broadcast to the others
+		if (newUserForCon.size() > 0) {
+			JSONObject newJsonUserInfoForCon = new JSONObject();
+			newJsonUserInfoForCon.put("command", "NEW_REGISTERED_USER");
+			newJsonUserInfoForCon.put("userinfo", newUserForCon);
+			incomeCon.writeMsg(newJsonUserInfoForCon.toJSONString());
+		}
+		
+		if (newUserForLocal.size() > 0) {
+			// save new user to local and broadcast to all the other connected servers except this income one
+			JSONObject newJsonUserInfoForLocal = new JSONObject();
+			newJsonUserInfoForLocal.put("command", "NEW_REGISTERED_USER");
+			newJsonUserInfoForLocal.put("userinfo", newUserForLocal);
+			Control.getInstance().broadcastMessage(incomeCon, newJsonUserInfoForLocal.toJSONString(), true);
+			// logout any user with wrong secret
+			Control.clientInfoManager.checkLoggingoutClients(newUserForLocal);
+			// when receive new user, check local login user, kick off the user with wrong password
+			FileOperator.saveNewUserInfo(newUserForLocal);
+		}
+	}
+	
+	/*
+	 * Save new user information to local storage
+	 */
+	@SuppressWarnings("unchecked")
+	public static synchronized void saveNewUserInfo(JSONObject newUserForLocal) {
+		JSONObject localUserInfo = allUserInfo();
+		for (Object key : newUserForLocal.keySet()) {
+			localUserInfo.put(key, newUserForLocal.get(key));
+		}
+		
+		saveUserInfoToLocal(localUserInfo.toJSONString());
+	}
 }

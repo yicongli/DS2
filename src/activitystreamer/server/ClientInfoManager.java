@@ -330,4 +330,28 @@ public class ClientInfoManager {
 			receiver_connection.writeMsg(message);
 		}
 	}
+	
+	/**
+	 * if any currently login clients has different secret compared with new income ones, then logout the user
+	 * @param clientsInfo
+	 */
+	public void checkLoggingoutClients (JSONObject clientsInfo) {
+		for (Object key : clientsInfo.keySet()) {
+			String username = (String) key;
+			JSONObject infoObj = (JSONObject)clientsInfo.get(key);
+			String secret   = (String)infoObj.get("password");
+			
+			ArrayList<LoginClientInfo> logoutClientInfos = new ArrayList<LoginClientInfo>();
+			for (LoginClientInfo localCLientInfo : getLoginClientInfos()) {
+				if (localCLientInfo.getUsername().equals(username)
+						&& !localCLientInfo.getSecret().equals(secret)) {
+					
+					Control.getInstance().connectionClosed(localCLientInfo.getConnection());
+					logoutClientInfos.add(localCLientInfo);
+				}
+			}
+			
+			getLoginClientInfos().removeAll(logoutClientInfos);
+		}
+	}
 }
