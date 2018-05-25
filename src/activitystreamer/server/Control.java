@@ -333,6 +333,7 @@ public class Control extends Thread {
 		msgObj.put("port", newPort);
 		con.writeMsg(msgObj.toJSONString());
 
+		log.debug("REDIRECT:"+ msgObj.toJSONString());
 		return true;
 	}
 
@@ -344,7 +345,8 @@ public class Control extends Thread {
 		JSONObject target = null;
 
 		for (JSONObject jsonAvailabilityObj : announcementInfo) {
-			if (jsonAvailabilityObj.containsKey("logout")) {
+			// if current annoucement related to a broken connection, then ignore the info
+			if (jsonAvailabilityObj.containsKey("broken")) {
 				continue;
 			}
 			
@@ -917,7 +919,7 @@ public class Control extends Thread {
 		for (JSONObject jsonObject : announcementInfo) {
 			if (jsonObject.get("hostname").equals(brokenCon.getIPAddress())
 					&& ((Long)jsonObject.get("port")).longValue() == brokenCon.getRemoteListenerPort().longValue()) {
-				jsonObject.put("logout", "true");
+				jsonObject.put("broken", "true");
 			}
 		}
 	}
@@ -1152,12 +1154,13 @@ public class Control extends Thread {
 	/*
 	 * check redirect once 5 seconds, redirect one client a time
 	 */
-	private void checkRedirection() {
+	private synchronized void checkRedirection() {
 		Connection redirectCon = null;
 		for (Connection curCon : connections) {
 			if (!curCon.getIsServer()) {
 				if (redirectionLogin(curCon)) {
 					redirectCon = curCon;
+					break;
 				}
 			}
 		}
