@@ -124,25 +124,12 @@ public class Connection extends Thread {
 		return remoteLitenerPort;
 	}
 
-	public void setRemoteLitenerPort(Long remoteLitenerPort) {
+	public void setRemoteListenerPort(Long remoteLitenerPort) {
 		this.remoteLitenerPort = remoteLitenerPort;
 	}
 	
 	public String getIPAddress () {
-		String IP = getSocket().getInetAddress().toString();
-		// if the server is in same IP address with current server, then get the current external IP
-		if (IP.contains("/")) {
-			IP = IP.substring(1);
-			if (IP.equals("127.0.0.1") || IP.equals("localhost")) {
-				return Settings.getIp();
-			}
-			else {
-				return IP;
-			}
-		}
-		else {
-			return Settings.getIp();
-		}
+		return Settings.getIp();
 	}
 	
 	public String getIPAddressWithPort () {

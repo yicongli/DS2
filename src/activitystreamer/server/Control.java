@@ -93,6 +93,7 @@ public class Control extends Thread {
 				Connection newConnection = outgoingConnection(serverSocket);
 				newConnection.setIsServer(true); 		// set flag of server
 				newConnection.setIsRemoteServer(true); // set if this server is the remote server
+				newConnection.setRemoteListenerPort(new Long(Settings.getRemotePort()));
 				requestAuthentication(newConnection); 	// send authentication to the parent server
 				resetReconnectOperation();
 			} catch (IOException e) {
@@ -346,7 +347,6 @@ public class Control extends Thread {
 			Long newLoad = (Long) jsonAvailabilityObj.get("load");
 			if (newLoad < currentLoad - 1) {
 				// get lowest load server
-				currentLoad = newLoad.intValue();
 				target = jsonAvailabilityObj;
 			}
 		}
@@ -371,7 +371,7 @@ public class Control extends Thread {
 			return true;
 		}
 
-		con.setRemoteLitenerPort((Long) authObj.get("port"));
+		con.setRemoteListenerPort((Long) authObj.get("port"));
 		con.setIsServer(true);
 		con.setSecret(Settings.getServerSecret());
 		// reply current server data to the new server
@@ -903,6 +903,22 @@ public class Control extends Thread {
 		broadcastMessage(con, msgObj.toJSONString(), true);
 		return false;
 	}
+	
+	/**
+	 * remove the announcement when one connection broken
+	 * @param brokenCon the broken connection
+	 */
+	private synchronized void removeAnnouncement(Connection brokenCon) {
+		ArrayList<JSONObject> removeArr = new ArrayList<JSONObject>();
+		for (JSONObject jsonObject : announcementInfo) {
+			if (jsonObject.get("hostname").equals(brokenCon.getIPAddress())
+					&& ((Long)jsonObject.get("port")).longValue() == brokenCon.getRemoteListenerPort().longValue()) {
+				removeArr.add(jsonObject);
+			}
+		}
+		
+		announcementInfo.removeAll(removeArr);
+	}
 
 	/*
 	 * The connection has been closed by the other party.
@@ -916,6 +932,8 @@ public class Control extends Thread {
 			if (con.getIsRemoteServer()) {
 				reconnectServer();
 			}
+			
+			removeAnnouncement(con); // remove the relevant announcement after connection broken
 			
 			// when one connection lost, check if currently has lock_allow request related to the connection
 			// if has, then remove the identify of this connection, and then check if need to reply lock_allow
@@ -1029,6 +1047,7 @@ public class Control extends Thread {
 					// if current server is not the first server, then connect to this server
 					// otherwise treat current server as root server
 					if (!(childHostname.equals(Settings.getIp()) && childport == Settings.getLocalPort())) {
+						log.debug(serverInfo);
 						return serverInfo;
 					}
 				}
