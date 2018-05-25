@@ -36,6 +36,7 @@ public class Control extends Thread {
 	public static ClientInfoManager clientInfoManager = null; // UserInfo manager
 	private static int reconnectTime = 0; 					// Reconnect time
 	private static Timer reconnectTimer = null; 			// Reconnect timer
+	private static ArrayList<JSONObject> activitiesCacheArray; // store activites maximum 200 items
 
 	protected static Control control = null;
 
@@ -51,6 +52,7 @@ public class Control extends Thread {
 		connections = new ArrayList<Connection>(); 		// initialize the connections item array
 		announcementInfo = new ArrayList<JSONObject>(); // initialize the announcement item array
 		lockItemArray = new ArrayList<LockItem>();		 // initialize the lock item array
+		activitiesCacheArray = new ArrayList<JSONObject>(); // initial cache array
 		clientInfoManager = new ClientInfoManager(); 	// manage login/logout user info
 		parser = new JSONParser(); 						// initialize parser and remote connection
 		uniqueID = Settings.nextSecret();
@@ -234,6 +236,8 @@ public class Control extends Thread {
 			return deleteLogoutUserInfo(con, msgObject);
 		case "NEW_REGISTERED_USER":
 			return receiveNewRegisterUserInfo(con, msgObject);
+		case "LOST_MESSAGE_REQUEST":
+			return receiveLostMessageRequest(con, msgObject);
 		default:
 			responseInvalidMsg("command is not exist", con);
 			return true;
@@ -710,6 +714,50 @@ public class Control extends Thread {
 		
 		return false;
 	}
+	
+	/**
+	 * when receive lost message request, then search local cache
+	 * if find cache data, then 
+	 * @param incomeCon
+	 * @param msgObj
+	 * @return
+	 */
+	private synchronized boolean receiveLostMessageRequest(Connection incomeCon, JSONObject msgObj) {
+		if (!incomeCon.getIsServer()) {
+			responseInvalidMsg("Message received from an unauthenticated server", incomeCon);
+			return true;
+		} else if (!msgObj.containsKey("username")) {
+			responseInvalidMsg("Message does not contain the userinfo field", incomeCon);
+			return true;
+		} else if (!msgObj.containsKey("ip")) {
+			responseInvalidMsg("Message does not contain the ip field", incomeCon);
+			return true;
+		} else if (!msgObj.containsKey("index")) {
+			responseInvalidMsg("Message does not contain the ip field", incomeCon);
+			return true;
+		}
+		
+		Gson gIndexArr = new Gson();
+		Type type = new TypeToken<ArrayList<Long>>() {}.getType();
+		// get all children server of the remote server
+		// the Long value will be convert into Double
+		ArrayList<Long> arrayList = gIndexArr.fromJson((String)msgObj.get("index"), type);
+		String username = (String)msgObj.get("username");
+		String ip = (String)msgObj.get("ip");
+		
+		for (Long Index : arrayList) {
+			// start searching from latest message
+			String keyValue = username + ip + Index;
+			for (int i = activitiesCacheArray.size() - 1; i >= 0; i--) {
+				JSONObject activity = activitiesCacheArray.get(i);
+				if (activity.containsKey(keyValue)) {
+					incomeCon.writeMsg(activity.get(keyValue).toString());
+				}
+			}
+		}
+
+		return false;
+	}
 
 	/*
 	 * add by yicongLI 19-04-18 broadcast activities
@@ -762,6 +810,17 @@ public class Control extends Thread {
 			msgObjFinal.put("ip", con.getIPAddressWithPort());
 
 			broadcastMessage(con, msgObjFinal.toJSONString(), false);
+			
+			// cache the activity, if the activity size arrived 100, then remove the first item
+			if (activitiesCacheArray.size() == 100) {
+				activitiesCacheArray.remove(0);
+			}
+			
+			// put message into array
+			JSONObject activity = new JSONObject();
+			activity.put(userName + con.getIPAddressWithPort() + latestIndex, msgObjFinal.toJSONString());
+			
+			activitiesCacheArray.add(activity);
 
 			return false;
 		} else {
@@ -954,8 +1013,7 @@ public class Control extends Thread {
 			if (hostname.equals(remoteHostname) && port == remotePort) {
 				String jsonString = (String) jsonObject.get("children");
 				Gson childrenServerInfo = new Gson();
-				Type type = new TypeToken<ArrayList<JSONObject>>() {
-				}.getType();
+				Type type = new TypeToken<ArrayList<JSONObject>>() {}.getType();
 				// get all children server of the remote server
 				// the Long value will be convert into Double
 				ArrayList<JSONObject> arrayList = childrenServerInfo.fromJson(jsonString, type);

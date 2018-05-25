@@ -273,8 +273,9 @@ public class ClientInfoManager {
 		int latestIndex = clientInfo.getLatestIndex();
 		
 		// if current activity the next one of the recorded latest activity, 
-		// or didn't have this user info before, then broadcast directly
-		if (curIndex == latestIndex + 1 || createNewClientInfo) {
+		// or didn't have this user info before, or the client has relogin(reset the index into 1)
+		// then broadcast directly
+		if (curIndex == latestIndex + 1 || curIndex == 1 || createNewClientInfo) {
 			clientInfo.setLatestIndex(curIndex);
 			return true;
 		}
