@@ -131,7 +131,18 @@ public class Connection extends Thread {
 	public String getIPAddress () {
 		String IP = getSocket().getInetAddress().toString();
 		// if the server is in same IP address with current server, then get the current external IP
-		return IP.equals("/127.0.0.1") ? Settings.getIp() : IP.substring(1, IP.length()-1);
+		if (IP.contains("/")) {
+			IP = IP.substring(1);
+			if (IP.equals("127.0.0.1") || IP.equals("localhost")) {
+				return Settings.getIp();
+			}
+			else {
+				return IP;
+			}
+		}
+		else {
+			return Settings.getIp();
+		}
 	}
 	
 	public String getIPAddressWithPort () {

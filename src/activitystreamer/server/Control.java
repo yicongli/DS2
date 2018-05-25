@@ -371,6 +371,7 @@ public class Control extends Thread {
 			return true;
 		}
 
+		con.setRemoteLitenerPort((Long) authObj.get("port"));
 		con.setIsServer(true);
 		con.setSecret(Settings.getServerSecret());
 		// reply current server data to the new server
@@ -892,7 +893,6 @@ public class Control extends Thread {
 
 		// if find the info exist in Arraylist, then replace the info
 		// else add to local storage.
-		con.setRemoteLitenerPort((Long) msgObj.get("port"));
 		if (sameInfoIndex != -1) {
 			announcementInfo.set(sameInfoIndex, msgObj);
 		} else {
