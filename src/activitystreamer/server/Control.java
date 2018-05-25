@@ -1116,10 +1116,10 @@ public class Control extends Thread {
 		ArrayList<JSONObject> childrenInfo = new ArrayList<JSONObject>();
 		for (Connection con : connections) {
 			// filter con of children server
-			if (con.getIsServer() && !con.getIsRemoteServer() && con.getRemoteLitenerPort() != 0) {
+			if (con.getIsServer() && !con.getIsRemoteServer() && con.getRemoteListenerPort() != 0) {
 				JSONObject info = new JSONObject();
 				info.put("hostname", con.getIPAddress());
-				info.put("port", con.getRemoteLitenerPort());
+				info.put("port", con.getRemoteListenerPort());
 
 				childrenInfo.add(info);
 			}

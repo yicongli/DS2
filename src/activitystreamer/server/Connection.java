@@ -120,7 +120,7 @@ public class Connection extends Thread {
 		this.isRemoteServer = isRServer;
 	}
 
-	public Long getRemoteLitenerPort() {
+	public Long getRemoteListenerPort() {
 		return remoteLitenerPort;
 	}
 
