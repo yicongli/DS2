@@ -248,6 +248,7 @@ public class ClientInfoManager {
 	 * @param sender_connection the connection of sender
 	 * @return true: broadcast to all client; false: prevent broadcast to clients
 	 */
+	@SuppressWarnings("unchecked")
 	public boolean checkIfBroadcastToClients(JSONObject msgObject, Connection sender_connection) {
 		IncomeActicityClientInfo clientInfo = null;
 		
@@ -278,16 +279,9 @@ public class ClientInfoManager {
 			return true;
 		}
 		
-		// TODO: how to handle the situation that the server join the system just in the unstable situation?
-		// which may cause that the latestIndex initialised with a message which is not the latest one
-		
-		
-		
-		if (curIndex < latestIndex) {
-			// if current index less than latestIndex, means currently missing message
+		if (curIndex >= clientInfo.getFirstIndex()) {
+			// if current index less than first, means currently missing message
 			clientInfo.getMessageArray().add(msgObject.toJSONString());
-			// save the minimum one of curIndex and firstindex stored in local storage
-			clientInfo.setFirstIndex(Math.min(curIndex, clientInfo.getFirstIndex()));
 			sortActivityMessageArray(clientInfo.getMessageArray());
 			
 			// when get all user info, broadcast to the connected client
@@ -303,14 +297,29 @@ public class ClientInfoManager {
 				clientInfo.resetInfo();
 			}
 			
-		} else if (curIndex == latestIndex) {
-			// if the index is similar to the latest index, then ignore the message
 		} else if (curIndex > latestIndex + 1) {
 			// if the index is larger than the latest index+1, then store the message and wait for missing message
 			clientInfo.getMessageArray().add(msgObject.toJSONString());
 			clientInfo.setLatestIndex(curIndex);
 			clientInfo.setFirstIndex(latestIndex);
+			// request lost user info
+			JSONObject msgObjFinal = new JSONObject();
+			msgObjFinal.put("command", "LOST_MESSAGE_REQUEST");
+			msgObjFinal.put("username", name);
+			msgObjFinal.put("ip", ip);
+			
+			ArrayList<Long> indexArr = new ArrayList<Long>();
+			Gson gIndexArray = new Gson();
+			for (int i = clientInfo.getFirstIndex() + 1; i < clientInfo.getLatestIndex(); i++) {
+				indexArr.add(new Long(i));
+			}
+			
+			msgObjFinal.put("index", gIndexArray.toJson(indexArr));
+			sender_connection.writeMsg(msgObjFinal.toJSONString());
 		} 
+		
+		// if the index is same to the latest index, then ignore the message
+		// if the index is less than latest index, then it's not below to current request, then ignore the message
 		
 		return false;
 	}
