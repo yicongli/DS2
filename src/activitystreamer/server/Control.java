@@ -36,6 +36,7 @@ public class Control extends Thread {
 	public static ClientInfoManager clientInfoManager = null; // UserInfo manager
 	private static int reconnectTime = 0; 					// Reconnect time
 	private static Timer reconnectTimer = null; 			// Reconnect timer
+	private static ArrayList<JSONObject> activitiesCacheArray; // store activites maximum 200 items
 
 	protected static Control control = null;
 
@@ -51,6 +52,7 @@ public class Control extends Thread {
 		connections = new ArrayList<Connection>(); 		// initialize the connections item array
 		announcementInfo = new ArrayList<JSONObject>(); // initialize the announcement item array
 		lockItemArray = new ArrayList<LockItem>();		 // initialize the lock item array
+		activitiesCacheArray = new ArrayList<JSONObject>(); // initial cache array
 		clientInfoManager = new ClientInfoManager(); 	// manage login/logout user info
 		parser = new JSONParser(); 						// initialize parser and remote connection
 		uniqueID = Settings.nextSecret();
@@ -91,6 +93,7 @@ public class Control extends Thread {
 				Connection newConnection = outgoingConnection(serverSocket);
 				newConnection.setIsServer(true); 		// set flag of server
 				newConnection.setIsRemoteServer(true); // set if this server is the remote server
+				newConnection.setRemoteListenerPort(new Long(Settings.getRemotePort()));
 				requestAuthentication(newConnection); 	// send authentication to the parent server
 				resetReconnectOperation();
 			} catch (IOException e) {
@@ -234,6 +237,8 @@ public class Control extends Thread {
 			return deleteLogoutUserInfo(con, msgObject);
 		case "NEW_REGISTERED_USER":
 			return receiveNewRegisterUserInfo(con, msgObject);
+		case "LOST_MESSAGE_REQUEST":
+			return receiveLostMessageRequest(con, msgObject);
 		default:
 			responseInvalidMsg("command is not exist", con);
 			return true;
@@ -284,8 +289,8 @@ public class Control extends Thread {
 		}
 
 		// Search for the username
-		String localsecret = FileOperator.checkLocalStorage(username);
-		if (localsecret != null && localsecret.equals(secret)) {
+		JSONObject localsecret = FileOperator.checkLocalStorage(username);
+		if (localsecret != null && localsecret.get("password").equals(secret)) {
 			cmd = "LOGIN_SUCCESS";
 			info = "logged in as user " + username;
 			// store the login client information
@@ -328,6 +333,7 @@ public class Control extends Thread {
 		msgObj.put("port", newPort);
 		con.writeMsg(msgObj.toJSONString());
 
+		log.debug("REDIRECT:"+ msgObj.toJSONString());
 		return true;
 	}
 
@@ -339,10 +345,14 @@ public class Control extends Thread {
 		JSONObject target = null;
 
 		for (JSONObject jsonAvailabilityObj : announcementInfo) {
+			// if current annoucement related to a broken connection, then ignore the info
+			if (jsonAvailabilityObj.containsKey("broken")) {
+				continue;
+			}
+			
 			Long newLoad = (Long) jsonAvailabilityObj.get("load");
 			if (newLoad < currentLoad - 1) {
 				// get lowest load server
-				currentLoad = newLoad.intValue();
 				target = jsonAvailabilityObj;
 			}
 		}
@@ -367,6 +377,7 @@ public class Control extends Thread {
 			return true;
 		}
 
+		con.setRemoteListenerPort((Long) authObj.get("port"));
 		con.setIsServer(true);
 		con.setSecret(Settings.getServerSecret());
 		// reply current server data to the new server
@@ -471,8 +482,17 @@ public class Control extends Thread {
 		String username = (String) msgObj.get("username");
 		String secret = (String) msgObj.get("secret");
 		Long  registerTime = (Long) msgObj.get("registertime");
-
-		if (FileOperator.checkLocalStorage(username) != null) {
+		
+		JSONObject userInfo = FileOperator.checkLocalStorage(username);
+		Long localRegisterTime = new Long(0);
+		if (userInfo != null) {
+			localRegisterTime = (Long)userInfo.get("registertime");
+		}
+		
+		// if has user info in local storage, and the registertime in local is earlier, then reply lock_denied
+		// otherwise, if has user info in local storage, but the registertime in local is later, then override the local info
+		// if has no user info in local storage, then save the info directly
+		if (userInfo != null && localRegisterTime < registerTime) {
 			// if found name in local storage, then reply the deny message
 			msgObj.put("command", "LOCK_DENIED");
 			con.writeMsg(msgObj.toJSONString());
@@ -494,8 +514,6 @@ public class Control extends Thread {
 			}
 		}
 		
-		// TODO: handle the situation that two client register at the same time
-
 		return false;
 	}
 
@@ -609,7 +627,8 @@ public class Control extends Thread {
 			return true;
 		}
 
-		// when receive registered user info from incomeCon, synchronise the user info between local and incomeCon
+		// when receive registered user info from incomeCon, 
+		//  synchronise the user info between local and incomeCon
 		String jsonString = (String) msgObj.get("userinfo");
 		FileOperator.synchroniseNewUserInfo(jsonString, incomeCon);
 		
@@ -702,6 +721,50 @@ public class Control extends Thread {
 		
 		return false;
 	}
+	
+	/**
+	 * when receive lost message request, then search local cache
+	 * if find cache data, then 
+	 * @param incomeCon
+	 * @param msgObj
+	 * @return
+	 */
+	private synchronized boolean receiveLostMessageRequest(Connection incomeCon, JSONObject msgObj) {
+		if (!incomeCon.getIsServer()) {
+			responseInvalidMsg("Message received from an unauthenticated server", incomeCon);
+			return true;
+		} else if (!msgObj.containsKey("username")) {
+			responseInvalidMsg("Message does not contain the userinfo field", incomeCon);
+			return true;
+		} else if (!msgObj.containsKey("ip")) {
+			responseInvalidMsg("Message does not contain the ip field", incomeCon);
+			return true;
+		} else if (!msgObj.containsKey("index")) {
+			responseInvalidMsg("Message does not contain the ip field", incomeCon);
+			return true;
+		}
+		
+		Gson gIndexArr = new Gson();
+		Type type = new TypeToken<ArrayList<Long>>() {}.getType();
+		// get all children server of the remote server
+		// the Long value will be convert into Double
+		ArrayList<Long> arrayList = gIndexArr.fromJson((String)msgObj.get("index"), type);
+		String username = (String)msgObj.get("username");
+		String ip = (String)msgObj.get("ip");
+		
+		for (Long Index : arrayList) {
+			// start searching from latest message
+			String keyValue = username + ip + Index;
+			for (int i = activitiesCacheArray.size() - 1; i >= 0; i--) {
+				JSONObject activity = activitiesCacheArray.get(i);
+				if (activity.containsKey(keyValue)) {
+					incomeCon.writeMsg(activity.get(keyValue).toString());
+				}
+			}
+		}
+
+		return false;
+	}
 
 	/*
 	 * add by yicongLI 19-04-18 broadcast activities
@@ -754,6 +817,17 @@ public class Control extends Thread {
 			msgObjFinal.put("ip", con.getIPAddressWithPort());
 
 			broadcastMessage(con, msgObjFinal.toJSONString(), false);
+			
+			// cache the activity, if the activity size arrived 100, then remove the first item
+			if (activitiesCacheArray.size() == 100) {
+				activitiesCacheArray.remove(0);
+			}
+			
+			// put message into array
+			JSONObject activity = new JSONObject();
+			activity.put(userName + con.getIPAddressWithPort() + latestIndex, msgObjFinal.toJSONString());
+			
+			activitiesCacheArray.add(activity);
 
 			return false;
 		} else {
@@ -786,7 +860,7 @@ public class Control extends Thread {
 
 		// broadcast here
 		boolean sentToClient = clientInfoManager.checkIfBroadcastToClients(msgObject, con);
-		broadcastMessage(con, msgObject.toJSONString(), sentToClient);
+		broadcastMessage(con, msgObject.toJSONString(), !sentToClient);
 		
 		//TODO: How to deal with the failure model? need to resend the message?
 		return false;
@@ -825,7 +899,6 @@ public class Control extends Thread {
 
 		// if find the info exist in Arraylist, then replace the info
 		// else add to local storage.
-		con.setRemoteLitenerPort((Long) msgObj.get("port"));
 		if (sameInfoIndex != -1) {
 			announcementInfo.set(sameInfoIndex, msgObj);
 		} else {
@@ -835,6 +908,20 @@ public class Control extends Thread {
 		// broadcast message to other servers
 		broadcastMessage(con, msgObj.toJSONString(), true);
 		return false;
+	}
+	
+	/**
+	 * remove the announcement when one connection broken
+	 * @param brokenCon the broken connection
+	 */
+	@SuppressWarnings("unchecked")
+	private synchronized void setAnnouncementAsLogoutStatus(Connection brokenCon) {
+		for (JSONObject jsonObject : announcementInfo) {
+			if (jsonObject.get("hostname").equals(brokenCon.getIPAddress())
+					&& ((Long)jsonObject.get("port")).longValue() == brokenCon.getRemoteListenerPort().longValue()) {
+				jsonObject.put("broken", "true");
+			}
+		}
 	}
 
 	/*
@@ -849,6 +936,8 @@ public class Control extends Thread {
 			if (con.getIsRemoteServer()) {
 				reconnectServer();
 			}
+			
+			setAnnouncementAsLogoutStatus(con); // remove the relevant announcement after connection broken
 			
 			// when one connection lost, check if currently has lock_allow request related to the connection
 			// if has, then remove the identify of this connection, and then check if need to reply lock_allow
@@ -946,8 +1035,7 @@ public class Control extends Thread {
 			if (hostname.equals(remoteHostname) && port == remotePort) {
 				String jsonString = (String) jsonObject.get("children");
 				Gson childrenServerInfo = new Gson();
-				Type type = new TypeToken<ArrayList<JSONObject>>() {
-				}.getType();
+				Type type = new TypeToken<ArrayList<JSONObject>>() {}.getType();
 				// get all children server of the remote server
 				// the Long value will be convert into Double
 				ArrayList<JSONObject> arrayList = childrenServerInfo.fromJson(jsonString, type);
@@ -963,6 +1051,7 @@ public class Control extends Thread {
 					// if current server is not the first server, then connect to this server
 					// otherwise treat current server as root server
 					if (!(childHostname.equals(Settings.getIp()) && childport == Settings.getLocalPort())) {
+						log.debug(serverInfo);
 						return serverInfo;
 					}
 				}
@@ -1050,10 +1139,10 @@ public class Control extends Thread {
 		ArrayList<JSONObject> childrenInfo = new ArrayList<JSONObject>();
 		for (Connection con : connections) {
 			// filter con of children server
-			if (con.getIsServer() && !con.getIsRemoteServer() && con.getRemoteLitenerPort() != 0) {
+			if (con.getIsServer() && !con.getIsRemoteServer() && con.getRemoteListenerPort() != 0) {
 				JSONObject info = new JSONObject();
 				info.put("hostname", con.getIPAddress());
-				info.put("port", con.getRemoteLitenerPort());
+				info.put("port", con.getRemoteListenerPort());
 
 				childrenInfo.add(info);
 			}
@@ -1065,12 +1154,13 @@ public class Control extends Thread {
 	/*
 	 * check redirect once 5 seconds, redirect one client a time
 	 */
-	private void checkRedirection() {
+	private synchronized void checkRedirection() {
 		Connection redirectCon = null;
 		for (Connection curCon : connections) {
 			if (!curCon.getIsServer()) {
 				if (redirectionLogin(curCon)) {
 					redirectCon = curCon;
+					break;
 				}
 			}
 		}

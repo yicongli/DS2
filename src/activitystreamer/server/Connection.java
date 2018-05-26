@@ -120,18 +120,16 @@ public class Connection extends Thread {
 		this.isRemoteServer = isRServer;
 	}
 
-	public Long getRemoteLitenerPort() {
+	public Long getRemoteListenerPort() {
 		return remoteLitenerPort;
 	}
 
-	public void setRemoteLitenerPort(Long remoteLitenerPort) {
+	public void setRemoteListenerPort(Long remoteLitenerPort) {
 		this.remoteLitenerPort = remoteLitenerPort;
 	}
 	
 	public String getIPAddress () {
-		String IP = getSocket().getInetAddress().toString();
-		// if the server is in same IP address with current server, then get the current external IP
-		return IP.equals("/127.0.0.1") ? Settings.getIp() : IP.substring(1, IP.length()-1);
+		return Settings.getIp();
 	}
 	
 	public String getIPAddressWithPort () {
