@@ -791,6 +791,7 @@ public class Control extends Thread {
 		String username = (String)msgObj.get("username");
 		String ip = (String)msgObj.get("ip");
 		
+		boolean findMessage = false;
 		for (Long Index : arrayList) {
 			// start searching from latest message
 			String keyValue = username + ip + Index;
@@ -798,8 +799,13 @@ public class Control extends Thread {
 				JSONObject activity = activitiesCacheArray.get(i);
 				if (activity.containsKey(keyValue)) {
 					incomeCon.writeMsg(activity.get(keyValue).toString());
+					findMessage = true;
 				}
 			}
+		}
+		
+		if (!findMessage) {
+			broadcastMessage(incomeCon, msgObj.toJSONString(), true);
 		}
 
 		return false;
