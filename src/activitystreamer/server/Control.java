@@ -268,7 +268,7 @@ public class Control extends Thread {
 		msgObj.put("info", info);
 		con.writeMsg(msgObj.toJSONString());
 
-		//log.info(msgObj.toJSONString());
+		log.info(msgObj.toJSONString());
 	}
 
 	/*
@@ -602,6 +602,7 @@ public class Control extends Thread {
 	 */
 	@SuppressWarnings("unchecked")
 	public synchronized void checkReplyLockAllow(Connection connectCon) {
+		LockItem removeItem = null;
 		for (LockItem lockItem : lockItemArray) {
 			if (lockItem.ifNeedReplyOrginCon(connectCon)) {
 				if (!lockItem.getOriginCon().getIsServer()) {
@@ -620,9 +621,11 @@ public class Control extends Thread {
 					lockItem.getOriginCon().writeMsg(msgObj.toJSONString());
 				}
 
-				lockItemArray.remove(lockItem);
+				removeItem = lockItem;
 			}
 		}
+		
+		lockItemArray.remove(removeItem);
 	}
 
 	/*
@@ -673,6 +676,8 @@ public class Control extends Thread {
 		Gson gson = new Gson();
 		Type type = new TypeToken<LogoutClientInfo>() {}.getType();
 		clientInfoManager.recieveLogoutClientMessage(gson.fromJson(jsonString, type));
+		
+		broadcastActivities(con, msgObj.toJSONString());
 		return false;
 	}
 	
@@ -788,6 +793,7 @@ public class Control extends Thread {
 		String username = (String)msgObj.get("username");
 		String ip = (String)msgObj.get("ip");
 		
+		boolean findMessage = false;
 		for (Long Index : arrayList) {
 			// start searching from latest message
 			String keyValue = username + ip + Index;
@@ -795,8 +801,13 @@ public class Control extends Thread {
 				JSONObject activity = activitiesCacheArray.get(i);
 				if (activity.containsKey(keyValue)) {
 					incomeCon.writeMsg(activity.get(keyValue).toString());
+					findMessage = true;
 				}
 			}
+		}
+		
+		if (!findMessage) {
+			broadcastMessage(incomeCon, msgObj.toJSONString(), true);
 		}
 
 		return false;
