@@ -110,7 +110,6 @@ public class Server {
 			Settings.setLocalHostname(cmd.getOptionValue("lh"));
 		}
 
-		// set server secret? WTF?
 		if(cmd.hasOption("s")){
 			Settings.setServerSecret(cmd.getOptionValue("s"));
 		}
