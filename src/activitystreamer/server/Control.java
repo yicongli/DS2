@@ -943,6 +943,11 @@ public class Control extends Thread {
 			connections.remove(con);
 			con.closeCon();
 
+			// if connection is client
+			if (!(con.getIsServer() || con.getIsRemoteServer())) {
+				log.debug("Close the client");
+			}
+			
 			// if lost connection with parent server, then reconnect server
 			if (con.getIsRemoteServer()) {
 				reconnectServer();

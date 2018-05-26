@@ -1,4 +1,5 @@
 package activitystreamer.server;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -8,6 +9,9 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
 
 import com.google.gson.Gson;
+
+import activitystreamer.Client;
+import activitystreamer.client.ClientSkeleton;
 
 public class ClientInfoManager {
 	
@@ -360,7 +364,8 @@ public class ClientInfoManager {
 			}
 			
 			for (LoginClientInfo loginClientInfo : logoutClientInfos) {
-				Control.getInstance().connectionClosed(loginClientInfo.getConnection());
+				loginClientInfo.getConnection().writeMsg("confirm");
+				loginClientInfo.getConnection().closeCon();
 			}
 		}
 	}
