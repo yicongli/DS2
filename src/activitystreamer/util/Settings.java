@@ -60,6 +60,10 @@ public class Settings {
 	 * @return
 	 */
 	public static String getRemoteExternalHostname() {
+		if (remoteHostname == null) {
+			return remoteHostname;
+		}
+		
 		if (remoteHostname.contains("127.0.0.1") || remoteHostname.contains("localhost")) { 
 	        return Settings.getIp(); 
 	    } else {
