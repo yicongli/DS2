@@ -53,7 +53,7 @@ public class Connection extends Thread {
 	
 	public void closeCon(){
 		if(open){
-			log.info("closing connection "+getIPAddressWithPort());
+			//log.info("closing connection "+getIPAddressWithPort());
 			try {
 				term=true;
 				inreader.close();

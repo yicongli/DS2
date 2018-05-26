@@ -268,7 +268,7 @@ public class Control extends Thread {
 		msgObj.put("info", info);
 		con.writeMsg(msgObj.toJSONString());
 
-		log.info(msgObj.toJSONString());
+		//log.info(msgObj.toJSONString());
 	}
 
 	/*
@@ -510,7 +510,7 @@ public class Control extends Thread {
 			msgObj.put("command", "LOCK_DENIED");
 			con.writeMsg(msgObj.toJSONString());
 
-			log.info(msgObj.toJSONString());
+			//log.info(msgObj.toJSONString());
 		} else {
 			FileOperator.saveUserName(username, secret, registerTime);
 
@@ -519,7 +519,7 @@ public class Control extends Thread {
 			if (receiverIdentifies.size() == 0) {
 				msgObj.put("command", "LOCK_ALLOWED");
 				con.writeMsg(msgObj.toJSONString());
-				log.info(msgObj.toJSONString());
+				//log.info(msgObj.toJSONString());
 			} else {
 				// add record of this lock request
 				LockItem item = new LockItem(username, secret, registerTime, con, receiverIdentifies);
@@ -1098,7 +1098,7 @@ public class Control extends Thread {
 					// if current server is not the first server, then connect to this server
 					// otherwise treat current server as root server
 					if (!(childHostname.equals(Settings.getIp()) && childport == Settings.getLocalPort())) {
-						log.debug(serverInfo);
+						//log.debug(serverInfo);
 						return serverInfo;
 					}
 				}
