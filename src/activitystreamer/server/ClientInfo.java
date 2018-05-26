@@ -123,7 +123,7 @@ class LoginClientInfo extends ClientInfo {
 	private int latestIndex = 0;
 	
 	public LoginClientInfo(String name, String sec, Connection con) {
-		super(name, con.getIPAddressWithPort());
+		super(name, con.getIPAddress());
 		connection = con;
 		secret = sec;
 	}
@@ -167,7 +167,7 @@ class IncomeActicityClientInfo extends ClientInfo {
 	private int firstIndex = 1000;  // the first index of missing message
 	
 	public IncomeActicityClientInfo(String name, Connection con) {
-		super(name, con.getIPAddressWithPort());
+		super(name, con.getIPAddress());
 	}
 
 	public int getLatestIndex() {

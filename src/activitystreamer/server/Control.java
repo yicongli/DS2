@@ -814,7 +814,7 @@ public class Control extends Thread {
 			// add time stamp and index
 			msgObjFinal.put("timestamp", new Long(new Date().getTime()));
 			msgObjFinal.put("index", new Integer(latestIndex));
-			msgObjFinal.put("ip", con.getIPAddressWithPort());
+			msgObjFinal.put("ip", con.getIPAddress());
 
 			broadcastMessage(con, msgObjFinal.toJSONString(), false);
 			
@@ -825,7 +825,7 @@ public class Control extends Thread {
 			
 			// put message into array
 			JSONObject activity = new JSONObject();
-			activity.put(userName + con.getIPAddressWithPort() + latestIndex, msgObjFinal.toJSONString());
+			activity.put(userName + con.getIPAddress() + latestIndex, msgObjFinal.toJSONString());
 			
 			activitiesCacheArray.add(activity);
 
