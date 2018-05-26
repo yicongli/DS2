@@ -48,7 +48,8 @@ public class ClientInfo {
 	 */
 	@Override
 	public boolean equals (Object usr) {
-		if (!usr.getClass().equals(ClientInfo.class)) {
+		if (!usr.getClass().getSuperclass().equals(ClientInfo.class) 
+				&& !usr.getClass().equals(ClientInfo.class)) {
 			return false;
 		}
 		

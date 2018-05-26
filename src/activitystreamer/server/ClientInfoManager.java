@@ -131,6 +131,7 @@ public class ClientInfoManager {
 		
 		if (curClientInfo != null) {
 			getLoginClientInfos().remove(curClientInfo);
+			Control.log.debug("User:"+curClientInfo.getUsername()+"Logout");
 		}
 		
 		return curClientInfo != null;
