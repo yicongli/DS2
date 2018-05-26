@@ -286,7 +286,7 @@ public class ClientInfoManager {
 			sortActivityMessageArray(clientInfo.getMessageArray());
 			
 			// when get all user info, broadcast to the connected client
-			if (clientInfo.getLatestIndex() - clientInfo.getFirstIndex() == clientInfo.getMessageArray().size() - 1) {
+			if (clientInfo.getLatestIndex() - clientInfo.getFirstIndex() == clientInfo.getMessageArray().size()) {
 				for (String activityMsg : clientInfo.getMessageArray()) {
 					broadcastMessageToClient(activityMsg);
 				}
