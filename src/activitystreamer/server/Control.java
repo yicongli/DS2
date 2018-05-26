@@ -676,6 +676,8 @@ public class Control extends Thread {
 		Gson gson = new Gson();
 		Type type = new TypeToken<LogoutClientInfo>() {}.getType();
 		clientInfoManager.recieveLogoutClientMessage(gson.fromJson(jsonString, type));
+		
+		broadcastActivities(con, msgObj.toJSONString());
 		return false;
 	}
 	
