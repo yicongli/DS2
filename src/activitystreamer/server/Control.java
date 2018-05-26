@@ -602,6 +602,7 @@ public class Control extends Thread {
 	 */
 	@SuppressWarnings("unchecked")
 	public synchronized void checkReplyLockAllow(Connection connectCon) {
+		LockItem removeItem = null;
 		for (LockItem lockItem : lockItemArray) {
 			if (lockItem.ifNeedReplyOrginCon(connectCon)) {
 				if (!lockItem.getOriginCon().getIsServer()) {
@@ -620,9 +621,11 @@ public class Control extends Thread {
 					lockItem.getOriginCon().writeMsg(msgObj.toJSONString());
 				}
 
-				lockItemArray.remove(lockItem);
+				removeItem = lockItem;
 			}
 		}
+		
+		lockItemArray.remove(removeItem);
 	}
 
 	/*
