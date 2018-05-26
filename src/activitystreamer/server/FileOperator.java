@@ -154,22 +154,22 @@ public class FileOperator {
 				if (!localInfo.get("password").equals(incomeInfo.get("password"))) {
 					// if local info register later, then override the local user information
 					if ((Long)localInfo.get("registertime") > (Long)incomeInfo.get("registertime")) {
-						newUserForLocal.put(key, incomeInfo.get(key));
+						newUserForLocal.put(key, incomeInfo);
 					// otherwise override the remote userinfo
 					} else {
-						newUserForCon.put(key, localInfo.get(key));
+						newUserForCon.put(key, localInfo);
 					}
 				}
 			// if there are unknown userinfo in local, then add them to remote userinfo
 			} else {
-				newUserForCon.put(key, localList.get(key));
+				newUserForCon.put(key, localList);
 			}
 		}
 		
 		// if there are unknown userinfo in local, then add them to remote userinfo
 		for (Object key : incomeList.keySet()) { 
 			if (!localList.containsKey(key)) {
-				newUserForLocal.put(key, incomeList.get(key));
+				newUserForLocal.put(key, incomeList);
 			}
 		}
 		
