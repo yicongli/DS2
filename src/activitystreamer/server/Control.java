@@ -233,6 +233,8 @@ public class Control extends Thread {
 			return saveUserInfo(con, msgObject);
 		case "LOGOUT_USER_MESSAGE":
 			return saveLogoutUserInfo(con, msgObject);
+		case "NEW_LOGOUT_USER":
+			return receiveNewLogoutUserInfo(con, msgObject);
 		case "DELETE_LOGOUT_USER":
 			return deleteLogoutUserInfo(con, msgObject);
 		case "NEW_REGISTERED_USER":
@@ -644,16 +646,8 @@ public class Control extends Thread {
 		FileOperator.synchroniseNewUserInfo(jsonString, incomeCon);
 		
 
-		// store logout user info into userManager
-		jsonString = (String) msgObj.get("logoutUserInfos");
-		Gson gson = new Gson();
-		Type type = new TypeToken<ArrayList<LogoutClientInfo>>() {}.getType();
-		ArrayList<LogoutClientInfo> arrayList = gson.fromJson(jsonString, type);
-		for (LogoutClientInfo logoutClientInfo : arrayList) {
-			logoutClientInfo.setLogoutFromCurrentServer(false);
-		}
-		
-		clientInfoManager.setLogoutClientInfos(arrayList);
+		// synchronise logout user info into userManager
+		clientInfoManager.synchroniseLogoutClientInfos(msgObj, incomeCon);
 
 		// save the remoteHostName of remote host
 		Settings.setParentHostNameOfRemote((String) msgObj.get("remotehostname"));
@@ -678,7 +672,38 @@ public class Control extends Thread {
 		String jsonString = (String) msgObj.get("userinfo");
 		Gson gson = new Gson();
 		Type type = new TypeToken<LogoutClientInfo>() {}.getType();
-		clientInfoManager.recieveLogoutClientInfo(gson.fromJson(jsonString, type));
+		clientInfoManager.recieveLogoutClientMessage(gson.fromJson(jsonString, type));
+		return false;
+	}
+	
+	/**
+	 * After receiving new logout user info, then store in 
+	 * @param incomeCon
+	 * @param msgObj
+	 * @return if break connection
+	 */
+	private synchronized boolean receiveNewLogoutUserInfo(Connection incomeCon, JSONObject msgObj) {
+		if (!incomeCon.getIsServer()) {
+			responseInvalidMsg("Message received from an unauthenticated server", incomeCon);
+			return true;
+		} else if (!msgObj.containsKey("userinfo")) {
+			responseInvalidMsg("Message does not contain the userinfo field", incomeCon);
+			return true;
+		}
+		
+		String jsonString = (String) msgObj.get("userinfo");
+		Gson gson = new Gson();
+		Type type = new TypeToken<ArrayList<LogoutClientInfo>>() {}.getType();
+		ArrayList<LogoutClientInfo> newInfo = gson.fromJson(jsonString, type);
+		for (LogoutClientInfo logoutClientInfo : newInfo) {
+			logoutClientInfo.setLogoutFromCurrentServer(false);
+		}
+		
+		clientInfoManager.getLogoutClientInfos().addAll(newInfo);
+
+		// broadcast message to the other servers
+		broadcastMessage(incomeCon, msgObj.toJSONString(), true);
+		
 		return false;
 	}
 

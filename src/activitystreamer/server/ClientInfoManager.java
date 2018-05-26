@@ -1,4 +1,5 @@
 package activitystreamer.server;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -8,6 +9,7 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
 
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 public class ClientInfoManager {
 	
@@ -188,7 +190,7 @@ public class ClientInfoManager {
 	 *  Has: then add message to local storage and sort the message by time stamp
 	 *  Hasn't: add user to the local storage directly
 	 */
-	public synchronized void recieveLogoutClientInfo(LogoutClientInfo clientInfo) {
+	public synchronized void recieveLogoutClientMessage(LogoutClientInfo clientInfo) {
 		Boolean findLogoutClient = false;
 		for (LogoutClientInfo logoutClientInfo : getLogoutClientInfos()) {
 			if (logoutClientInfo.equals(clientInfo)) {
@@ -351,18 +353,67 @@ public class ClientInfoManager {
 			JSONObject infoObj = (JSONObject)clientsInfo.get(key);
 			String secret   = (String)infoObj.get("password");
 			
-			ArrayList<LoginClientInfo> logoutClientInfos = new ArrayList<LoginClientInfo>();
+			ArrayList<LoginClientInfo> logoutClients = new ArrayList<LoginClientInfo>();
 			for (LoginClientInfo localCLientInfo : getLoginClientInfos()) {
 				if (localCLientInfo.getUsername().equals(username)
 						&& !localCLientInfo.getSecret().equals(secret)) {
-					logoutClientInfos.add(localCLientInfo);
+					logoutClients.add(localCLientInfo);
 				}
 			}
 			
-			for (LoginClientInfo loginClientInfo : logoutClientInfos) {
+			for (LoginClientInfo loginClientInfo : logoutClients) {
 				loginClientInfo.getConnection().writeMsg("confirm");
 				loginClientInfo.getConnection().closeCon();
 			}
+		}
+	}
+	
+	/**
+	 * synchronise the logout client info after receive userinfo push from the connected server
+	 * @param jClientInfos  logout client info 
+	 * @param incomeCon		incoming connection
+	 */
+	@SuppressWarnings("unchecked")
+	public void synchroniseLogoutClientInfos (JSONObject jClientInfos, Connection incomeCon) {
+		String jsonString = (String) jClientInfos.get("logoutUserInfos");
+		Gson gson = new Gson();
+		Type type = new TypeToken<ArrayList<LogoutClientInfo>>() {}.getType();
+		ArrayList<LogoutClientInfo> arrayList = gson.fromJson(jsonString, type);
+		
+		// filter the client that remote server doesn't have / local server doesn't have
+		ArrayList<LogoutClientInfo> newListForRemote = new ArrayList<LogoutClientInfo>();
+		ArrayList<LogoutClientInfo> newListForLocal = new ArrayList<LogoutClientInfo>();
+		for (LogoutClientInfo logoutClientInfo : arrayList) {
+			if (!getLogoutClientInfos().contains(logoutClientInfo)) {
+				newListForLocal.add(logoutClientInfo);
+				logoutClientInfo.setLogoutFromCurrentServer(false);
+			}
+		}
+		
+		for (LogoutClientInfo logoutClientInfo : getLogoutClientInfos()) {
+			if (!arrayList.contains(logoutClientInfo)) {
+				newListForRemote.add(logoutClientInfo);
+			}
+		}
+		
+		// if find  new logout client for remote server, then reply remote server
+		if (newListForRemote.size() != 0) {
+			JSONObject newJsonUserInfoForCon = new JSONObject();
+			newJsonUserInfoForCon.put("command", "NEW_LOGOUT_USER");
+			Gson gInfo = new Gson();
+			newJsonUserInfoForCon.put("userinfo", gInfo.toJson(newListForRemote));
+			incomeCon.writeMsg(newJsonUserInfoForCon.toJSONString());
+		}
+		
+		// if find  new logout client for local server, then store the info and broadcast to the others.
+		if (newListForLocal.size() != 0) {
+			getLogoutClientInfos().addAll(newListForLocal);
+			
+			JSONObject newJsonUserInfoForLocal = new JSONObject();
+			newJsonUserInfoForLocal.put("command", "NEW_LOGOUT_USER");
+			Gson gInfo = new Gson();
+			newJsonUserInfoForLocal.put("userinfo", gInfo.toJson(newListForRemote));
+			Control.getInstance().broadcastMessage(incomeCon, newJsonUserInfoForLocal.toJSONString(), true);
 		}
 	}
 }
