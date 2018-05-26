@@ -268,7 +268,7 @@ public class Control extends Thread {
 		msgObj.put("info", info);
 		con.writeMsg(msgObj.toJSONString());
 
-		//log.info(msgObj.toJSONString());
+		log.info(msgObj.toJSONString());
 	}
 
 	/*
