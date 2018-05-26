@@ -290,17 +290,28 @@ public class Control extends Thread {
 
 		// Search for the username
 		JSONObject localsecret = FileOperator.checkLocalStorage(username);
+		// one server can only login once on one IP address
+		Predicate<? super LoginClientInfo> filter = s -> username.equals(s.getUsername()) 
+														&& con.getIPAddress().equals(s.getConnection().getIPAddress());
+		List<LoginClientInfo> curItem = clientInfoManager.getLoginClientInfos().stream()
+															.filter(filter).collect(Collectors.toList());
+		
 		if (localsecret != null && localsecret.get("password").equals(secret)) {
-			cmd = "LOGIN_SUCCESS";
-			info = "logged in as user " + username;
-			// store the login client information
-			clientInfoManager.addNewLoginClientInfo(username, secret, con);
-			responseMsg(cmd, info, con);
+			if (curItem.size() == 0) {
+				cmd = "LOGIN_SUCCESS";
+				info = "logged in as user " + username;
+				// store the login client information
+				clientInfoManager.addNewLoginClientInfo(username, secret, con);
+				responseMsg(cmd, info, con);
 
-			// check if need to redirect login, if need, then close current server
-			return redirectionLogin(con);
+				// check if need to redirect login, if need, then close current server
+				return redirectionLogin(con);
+			} else {
+				return loginFailed("User:" + username + " has already logged in on " + con.getIPAddress(), con);
+			}
+			
 		} else {
-			return loginFailed("User" + username + " not found or secret: " + secret + " not right", con);
+			return loginFailed("User:" + username + " not found or secret: " + secret + " not right", con);
 		}
 	}
 
@@ -814,7 +825,7 @@ public class Control extends Thread {
 			// add time stamp and index
 			msgObjFinal.put("timestamp", new Long(new Date().getTime()));
 			msgObjFinal.put("index", new Integer(latestIndex));
-			msgObjFinal.put("ip", con.getIPAddressWithPort());
+			msgObjFinal.put("ip", con.getIPAddress());
 
 			broadcastMessage(con, msgObjFinal.toJSONString(), false);
 			
@@ -825,7 +836,7 @@ public class Control extends Thread {
 			
 			// put message into array
 			JSONObject activity = new JSONObject();
-			activity.put(userName + con.getIPAddressWithPort() + latestIndex, msgObjFinal.toJSONString());
+			activity.put(userName + con.getIPAddress() + latestIndex, msgObjFinal.toJSONString());
 			
 			activitiesCacheArray.add(activity);
 

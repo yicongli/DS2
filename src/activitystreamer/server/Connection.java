@@ -129,11 +129,22 @@ public class Connection extends Thread {
 	}
 	
 	public String getIPAddress () {
-		return Settings.getIp();
+	    String IP = getSocket().getInetAddress().toString(); 
+	    // if the server is in same IP address with current server, then get the current external IP 
+	    if (IP.contains("127.0.0.1") || IP.contains("localhost")) { 
+	        return Settings.getIp(); 
+	    } else if (IP.contains("/")) {
+	    	return IP.substring(1);
+		} else {
+			return IP; 
+		}
 	}
 	
+	/**
+	 * Is just used for identify current connection, cannot be used for identify the connection that has been broken
+	 * @return
+	 */
 	public String getIPAddressWithPort () {
-		String IP = getIPAddress();
-		return IP + ":" + socket.getPort();
+		return getIPAddress () + ":" + socket.getPort(); 
 	}
 }
