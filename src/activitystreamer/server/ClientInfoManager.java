@@ -355,13 +355,13 @@ public class ClientInfoManager {
 			for (LoginClientInfo localCLientInfo : getLoginClientInfos()) {
 				if (localCLientInfo.getUsername().equals(username)
 						&& !localCLientInfo.getSecret().equals(secret)) {
-					
-					Control.getInstance().connectionClosed(localCLientInfo.getConnection());
 					logoutClientInfos.add(localCLientInfo);
 				}
 			}
 			
-			getLoginClientInfos().removeAll(logoutClientInfos);
+			for (LoginClientInfo loginClientInfo : logoutClientInfos) {
+				Control.getInstance().connectionClosed(loginClientInfo.getConnection());
+			}
 		}
 	}
 }
