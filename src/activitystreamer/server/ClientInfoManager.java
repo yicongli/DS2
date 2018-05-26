@@ -149,7 +149,6 @@ public class ClientInfoManager {
 			try {
 				msgObject = (JSONObject) Control.parser.parse(jsonStr);
 			} catch (Exception e) {
-				
 				e.printStackTrace();
 			}
 			

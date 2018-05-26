@@ -915,6 +915,16 @@ public class Control extends Thread {
 		} else {
 			announcementInfo.add(msgObj);
 		}
+		
+		// save the remoteHostName of remote host
+		if (msgObj.get("hostname").equals(Settings.getRemoteHostname()) 
+				&& ((Long)msgObj.get("port")).intValue() == Settings.getRemotePort()) {
+			
+			Settings.setParentHostNameOfRemote((String) msgObj.get("remotehostname"));
+			Long portNum = (Long) msgObj.get("remoteport");
+			Settings.setParentPortOfRemote(portNum.intValue());
+		}
+		
 
 		// broadcast message to other servers
 		broadcastMessage(con, msgObj.toJSONString(), true);
@@ -1123,6 +1133,8 @@ public class Control extends Thread {
 		msgObj.put("load", clientLoadNum());
 		msgObj.put("hostname", Settings.getIp());
 		msgObj.put("port", Settings.getLocalPort());
+		msgObj.put("remotehostname", Settings.getRemoteHostname());
+		msgObj.put("remoteport", Settings.getRemotePort());
 
 		// put children server address info into announcement
 		Gson childrenServerInfo = new Gson();
