@@ -162,14 +162,14 @@ public class FileOperator {
 				}
 			// if there are unknown userinfo in local, then add them to remote userinfo
 			} else {
-				newUserForCon.put(key, localList);
+				newUserForCon.put(key, localList.get(key));
 			}
 		}
 		
 		// if there are unknown userinfo in local, then add them to remote userinfo
 		for (Object key : incomeList.keySet()) { 
 			if (!localList.containsKey(key)) {
-				newUserForLocal.put(key, incomeList);
+				newUserForLocal.put(key, incomeList.get(key));
 			}
 		}
 		
