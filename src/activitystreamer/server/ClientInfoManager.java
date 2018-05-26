@@ -79,7 +79,7 @@ public class ClientInfoManager {
 			JSONObject msgObj = new JSONObject();
 			msgObj.put("command", "DELETE_LOGOUT_USER");
 			Gson gUserInfo = new Gson();
-			msgObj.put("userInfo", gUserInfo.toJson(oldClient));
+			msgObj.put("userinfo", gUserInfo.toJson(oldClient));
 			
 			String msgStr = msgObj.toJSONString();
 			Control.getInstance().broadcastMessage(null, msgStr, true);
