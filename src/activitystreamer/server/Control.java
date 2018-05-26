@@ -405,7 +405,7 @@ public class Control extends Thread {
 	private synchronized void userInfoReply(Connection outCon) {
 		JSONObject msgObj = new JSONObject();
 		msgObj.put("command", "USERINFOREPLY");
-		msgObj.put("remotehostname", Settings.getRemoteHostname());
+		msgObj.put("remotehostname", Settings.getRemoteExternalHostname());
 		msgObj.put("remoteport", Settings.getRemotePort());
 		msgObj.put("userinfo", FileOperator.allUserInfo().toJSONString());
 
@@ -942,7 +942,7 @@ public class Control extends Thread {
 		}
 		
 		// save the remoteHostName of remote host
-		if (msgObj.get("hostname").equals(Settings.getRemoteHostname()) 
+		if (msgObj.get("hostname").equals(Settings.getRemoteExternalHostname()) 
 				&& ((Long)msgObj.get("port")).intValue() == Settings.getRemotePort()) {
 			
 			Settings.setParentHostNameOfRemote((String) msgObj.get("remotehostname"));
@@ -1075,12 +1075,8 @@ public class Control extends Thread {
 			Long port = (Long) jsonObject.get("port");
 			
 			// get local remote host
-			String remoteHostname = Settings.getRemoteHostname();
+			String remoteHostname = Settings.getRemoteExternalHostname();
 			int remotePort = Settings.getRemotePort();
-
-			if (remoteHostname.equals("localhost") || remoteHostname.equals("127.0.0.1")) {
-				remoteHostname = Settings.getIp();
-			}
 
 			// find the remote server from server announcements
 			if (hostname.equals(remoteHostname) && port == remotePort) {
@@ -1158,7 +1154,7 @@ public class Control extends Thread {
 		msgObj.put("load", clientLoadNum());
 		msgObj.put("hostname", Settings.getIp());
 		msgObj.put("port", Settings.getLocalPort());
-		msgObj.put("remotehostname", Settings.getRemoteHostname());
+		msgObj.put("remotehostname", Settings.getRemoteExternalHostname());
 		msgObj.put("remoteport", Settings.getRemotePort());
 
 		// put children server address info into announcement

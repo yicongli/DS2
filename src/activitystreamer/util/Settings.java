@@ -54,6 +54,18 @@ public class Settings {
 	public static String getRemoteHostname() {
 		return remoteHostname;
 	}
+	
+	/**
+	 * get external hostname
+	 * @return
+	 */
+	public static String getRemoteExternalHostname() {
+		if (remoteHostname.contains("127.0.0.1") || remoteHostname.contains("localhost")) { 
+	        return Settings.getIp(); 
+	    } else {
+			return remoteHostname; 
+		}
+	}
 
 	public static void setRemoteHostname(String remoteHostname) {
 		Settings.remoteHostname = remoteHostname;
